@@ -1,0 +1,67 @@
+<div 
+    class="manga-card" 
+    x-data="mangaCard({{ manga.id }})"
+    @click="handleClick()"
+    @keydown="handleKeydown($event)"
+    tabindex="0"
+    role="button"
+    :aria-label="'View details for {{ manga.title }}'"
+    :class="{ 'loading': loading }"
+>
+    <div class="manga-cover">
+        <span class="cover-placeholder">sample</span>
+        {% if manga.tags and manga.tags|length > 0 %}
+            <div class="cycling-tags" style="--scroll-duration: {{ [manga.tags|length * 4, 12]|max }}s" aria-hidden="true">
+                <div class="tag-container">
+                    {% for i in range(3) %}
+                        {% for tag in manga.tags %}
+                            <span class="tag-item">{{ tag }}</span>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    <div class="manga-info">
+        <div class="manga-title">{{ manga.title }}</div>
+        <div class="manga-rating" aria-label="Rating: {{ manga.rating }} out of 10">
+            ★ {{ manga.rating }}/10
+        </div>
+    </div>
+</div>
+
+<script>
+    function mangaCard(mangaId) {
+        return {
+            loading: false,
+            mangaId: mangaId,
+            
+            async handleClick() {
+                if (this.loading) return;
+                
+                try {
+                    this.loading = true;
+                    console.log('Clicked manga ID:', this.mangaId);
+                    
+                    // Simulate async operation
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Here you could navigate to manga detail page
+                    // window.location.href = `/manga/${this.mangaId}`;
+                    
+                } catch (error) {
+                    console.error('Error handling manga click:', error);
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            handleKeydown(event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    this.handleClick();
+                }
+            }
+        }
+    }
+</script>

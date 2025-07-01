@@ -1,0 +1,53 @@
+{% if show_search_results %}
+    <!-- Search Results Section -->
+    <section>
+        <h2 class="section-title">
+            🔍 Search Results ({{ sections.search_results.count }} found)
+        </h2>
+        {% if sections.search_results.manga %}
+            <div class="manga-grid">
+                {% for manga in sections.search_results.manga %}
+                    {% include 'components/manga_card.html' %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-results">
+                <p class="text-muted">No manga found matching your criteria.</p>
+            </div>
+        {% endif %}
+    </section>
+{% else %}
+    <!-- Default Sections -->
+    {% if sections.trending %}
+        <section>
+            <h2 class="section-title">🔥 Trending Now</h2>
+            <div class="manga-grid">
+                {% for manga in sections.trending %}
+                    {% include 'components/manga_card.html' %}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    {% if sections.just_published %}
+        <section>
+            <h2 class="section-title">📚 Just Published</h2>
+            <div class="manga-grid">
+                {% for manga in sections.just_published %}
+                    {% include 'components/manga_card.html' %}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    {% if sections.curated %}
+        <section>
+            <h2 class="section-title">⭐ Editor's Choice</h2>
+            <div class="manga-grid">
+                {% for manga in sections.curated %}
+                    {% include 'components/manga_card.html' %}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+{% endif %}

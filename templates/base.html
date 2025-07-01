@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" x-data="themeManager()" :data-theme="theme">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MangaReader - Modern Manga Gallery{% endblock %}</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.13.1/dist/cdn.min.js"></script>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-primary">
+    <a href="#main" class="skip-link">Skip to main content</a>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-accent">MangaReader</h1>
+            <button 
+                class="theme-toggle" 
+                @click="toggleTheme()"
+                :aria-label="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+            >
+                <span x-text="theme === 'dark' ? '☀️' : '🌙'"></span>
+            </button>
+        </div>
+    </nav>
+
+    <main id="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Global Alpine.js Components -->
+    <script>
+        // Theme Manager
+        function themeManager() {
+            return {
+                theme: localStorage.getItem('theme') || 
+                       (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+                
+                init() {
+                    this.$watch('theme', value => {
+                        localStorage.setItem('theme', value);
+                        document.documentElement.setAttribute('data-theme', value);
+                    });
+                    
+                    // Set initial theme
+                    document.documentElement.setAttribute('data-theme', this.theme);
+                },
+                
+                toggleTheme() {
+                    this.theme = this.theme === 'dark' ? 'light' : 'dark';
+                    
+                    // Announce to screen readers
+                    const announcement = document.createElement('div');
+                    announcement.setAttribute('aria-live', 'polite');
+                    announcement.setAttribute('aria-atomic', 'true');
+                    announcement.style.position = 'absolute';
+                    announcement.style.left = '-10000px';
+                    announcement.textContent = `Switched to ${this.theme} theme`;
+                    
+                    document.body.appendChild(announcement);
+                    setTimeout(() => document.body.removeChild(announcement), 1000);
+                }
+            }
+        }
+
+        // Global utilities
+        window.mangaUtils = {
+            debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+        };
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

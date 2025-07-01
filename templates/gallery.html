@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" x-data="galleryManager()">
+    <!-- Search and Filters -->
+    <div class="search-container">
+        <input 
+            type="text" 
+            class="search-input" 
+            placeholder="Search manga titles..."
+            x-model="searchQuery"
+            @input="debouncedSearch()"
+        />
+        
+        <!-- Filter Toggle -->
+        <button 
+            class="filter-toggle" 
+            @click="filtersVisible = !filtersVisible"
+            :aria-expanded="filtersVisible"
+            aria-controls="filters-container"
+        >
+            <span>Filters</span>
+            <svg class="chevron-icon" 
+                 :class="{ 'rotated': filtersVisible }"
+                 viewBox="0 0 24 24" 
+                 fill="none" 
+                 stroke="currentColor" 
+                 stroke-width="2">
+                <path d="M6 9l6 6 6-6"></path>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Filters Container -->
+    <div 
+        id="filters-container"
+        class="filters-container"
+        :class="{ 'visible': filtersVisible }"
+        x-show="filtersVisible"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform -translate-y-2"
+        x-transition:enter-end="opacity-100 transform translate-y-0"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 transform translate-y-0"
+        x-transition:leave-end="opacity-0 transform -translate-y-2"
+    >
+        <!-- Status Filter -->
+        <div class="filter-group">
+            <label class="filter-label">Status</label>
+            <div class="filter-options">
+                <template x-for="status in statusOptions" :key="status">
+                    <div 
+                        class="filter-chip"
+                        :class="{ 'active': selectedStatuses.includes(status) }"
+                        @click="toggleStatusFilter(status)"
+                        x-text="status.charAt(0).toUpperCase() + status.slice(1)"
+                    ></div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Language Filter -->
+        <div class="filter-group">
+            <label class="filter-label">Language</label>
+            <div class="filter-options">
+                <template x-for="language in languageOptions" :key="language">
+                    <div 
+                        class="filter-chip"
+                        :class="{ 'active': selectedLanguages.includes(language) }"
+                        @click="toggleLanguageFilter(language)"
+                        x-text="language.charAt(0).toUpperCase() + language.slice(1)"
+                    ></div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Sort Options -->
+        <div class="filter-group">
+            <label class="filter-label">Sort By</label>
+            <select 
+                class="sort-select" 
+                x-model="sortBy"
+                @change="applyFilters()"
+            >
+                <option value="alphabetical">A-Z</option>
+                <option value="reverse-alphabetical">Z-A</option>
+                <option value="date-newest">Newest First</option>
+                <option value="date-oldest">Oldest First</option>
+                <option value="rating">Highest Rated</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Manga Sections -->
+    <div 
+        id="manga-sections"
+        hx-get="/search"
+        hx-trigger="load, search-updated from:body"
+        hx-include="[x-model]"
+        hx-vals="js:{
+            search: document.querySelector('[x-model=searchQuery]')?.value || '',
+            status: getSelectedValues('selectedStatuses'),
+            language: getSelectedValues('selectedLanguages'),
+            sort: document.querySelector('[x-model=sortBy]')?.value || 'alphabetical'
+        }"
+    >
+        {% include 'components/manga_sections.html' %}
+    </div>
+</div>
+
+<script>
+    function galleryManager() {
+        return {
+            searchQuery: '',
+            selectedStatuses: [],
+            selectedLanguages: [],
+            sortBy: 'alphabetical',
+            filtersVisible: false,
+            loading: false,
+            statusOptions: ['ongoing', 'completed', 'hiatus', 'cancelled'],
+            languageOptions: ['english', 'japanese', 'others'],
+            
+            init() {
+                // Setup debounced search
+                this.debouncedSearch = window.mangaUtils.debounce(() => {
+                    this.applyFilters();
+                }, 300);
+            },
+            
+            toggleStatusFilter(status) {
+                const index = this.selectedStatuses.indexOf(status);
+                if (index === -1) {
+                    this.selectedStatuses.push(status);
+                } else {
+                    this.selectedStatuses.splice(index, 1);
+                }
+                this.applyFilters();
+            },
+            
+            toggleLanguageFilter(language) {
+                const index = this.selectedLanguages.indexOf(language);
+                if (index === -1) {
+                    this.selectedLanguages.push(language);
+                } else {
+                    this.selectedLanguages.splice(index, 1);
+                }
+                this.applyFilters();
+            },
+            
+            applyFilters() {
+                // Trigger HTMX request
+                htmx.trigger(document.body, 'search-updated');
+            }
+        }
+    }
+    
+    // Helper function for HTMX vals
+    function getSelectedValues(propName) {
+        const galleryData = Alpine.$data(document.querySelector('[x-data*="galleryManager"]'));
+        return galleryData[propName];
+    }
+</script>
+{% endblock %}
