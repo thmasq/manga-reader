@@ -9,7 +9,23 @@
     :class="{ 'loading': loading }"
 >
     <div class="manga-cover">
-        <span class="cover-placeholder">sample</span>
+        {% if manga.cover_path %}
+            <img 
+                src="{{ url_for('serve_image', image_path=manga.cover_path) }}"
+                alt="Cover for {{ manga.title }}"
+                class="cover-image"
+                loading="lazy"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+            >
+            <div class="cover-placeholder" style="display: none;">
+                <span>No Cover</span>
+            </div>
+        {% else %}
+            <div class="cover-placeholder">
+                <span>No Cover</span>
+            </div>
+        {% endif %}
+        
         {% if manga.tags and manga.tags|length > 0 %}
             <div class="cycling-tags" style="--scroll-duration: {{ [manga.tags|length * 4, 12]|max }}s" aria-hidden="true">
                 <div class="tag-container">
@@ -27,6 +43,11 @@
         <div class="manga-rating" aria-label="Rating: {{ manga.rating }} out of 10">
             ★ {{ manga.rating }}/10
         </div>
+        <div class="manga-status">
+            <span class="status-badge status-{{ manga.status }}">
+                {{ manga.status|title }}
+            </span>
+        </div>
     </div>
 </div>
 
@@ -43,11 +64,16 @@
                     this.loading = true;
                     console.log('Clicked manga ID:', this.mangaId);
                     
-                    // Simulate async operation
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    // Here you could navigate to manga detail page
-                    // window.location.href = `/manga/${this.mangaId}`;
+                    const response = await fetch(`/manga/${this.mangaId}`);
+                    if (response.ok) {
+                        const mangaData = await response.json();
+                        console.log('Manga details:', mangaData);
+                        
+                        // Here you could open a modal or navigate to a detail page
+                        // For now, just log the data
+                    } else {
+                        console.error('Failed to fetch manga details');
+                    }
                     
                 } catch (error) {
                     console.error('Error handling manga click:', error);

@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: manga_db
+      POSTGRES_USER: manga_user
+      POSTGRES_PASSWORD: manga_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://manga_user:manga_password@db:5432/manga_db
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+    volumes:
+      - ./data:/app/data
+      - .:/app
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

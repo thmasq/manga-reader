@@ -1,167 +1,175 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 from datetime import datetime
+import psycopg2
+import psycopg2.extras
+import os
+import logging
 
 app = Flask(__name__)
 
-# Sample manga data
-SAMPLE_MANGA = [
-    {
-        "id": 1,
-        "title": "Attack on Titan",
-        "rating": 9.2,
-        "status": "completed",
-        "language": "japanese",
-        "tags": ["Action", "Drama", "Fantasy", "Military"],
-        "publishDate": "2009-09-09",
-    },
-    {
-        "id": 2,
-        "title": "One Piece",
-        "rating": 9.5,
-        "status": "ongoing",
-        "language": "japanese",
-        "tags": ["Adventure", "Comedy", "Shounen", "Pirates"],
-        "publishDate": "1997-07-22",
-    },
-    {
-        "id": 3,
-        "title": "Demon Slayer",
-        "rating": 8.8,
-        "status": "completed",
-        "language": "japanese",
-        "tags": ["Supernatural", "Historical", "Shounen"],
-        "publishDate": "2016-02-15",
-    },
-    {
-        "id": 4,
-        "title": "Tower of God",
-        "rating": 8.6,
-        "status": "ongoing",
-        "language": "english",
-        "tags": ["Adventure", "Mystery", "Supernatural"],
-        "publishDate": "2010-06-30",
-    },
-    {
-        "id": 5,
-        "title": "Solo Leveling",
-        "rating": 9.1,
-        "status": "completed",
-        "language": "english",
-        "tags": ["Action", "Adventure", "Fantasy"],
-        "publishDate": "2018-03-04",
-    },
-    {
-        "id": 6,
-        "title": "Chainsaw Man",
-        "rating": 8.9,
-        "status": "ongoing",
-        "language": "japanese",
-        "tags": ["Action", "Comedy", "Supernatural"],
-        "publishDate": "2018-12-03",
-    },
-    {
-        "id": 7,
-        "title": "My Hero Academia",
-        "rating": 8.4,
-        "status": "ongoing",
-        "language": "japanese",
-        "tags": ["Action", "School", "Superhero"],
-        "publishDate": "2014-07-07",
-    },
-    {
-        "id": 8,
-        "title": "The God of High School",
-        "rating": 8.2,
-        "status": "hiatus",
-        "language": "english",
-        "tags": ["Action", "Martial Arts", "School"],
-        "publishDate": "2011-04-08",
-    },
-    {
-        "id": 9,
-        "title": "Naruto",
-        "rating": 8.7,
-        "status": "completed",
-        "language": "japanese",
-        "tags": ["Action", "Martial Arts", "Ninja"],
-        "publishDate": "1999-09-21",
-    },
-    {
-        "id": 10,
-        "title": "Death Note",
-        "rating": 9.0,
-        "status": "completed",
-        "language": "japanese",
-        "tags": ["Supernatural", "Thriller", "Psychological"],
-        "publishDate": "2003-12-01",
-    },
-    {
-        "id": 11,
-        "title": "Vinland Saga",
-        "rating": 9.3,
-        "status": "ongoing",
-        "language": "japanese",
-        "tags": ["Action", "Adventure", "Historical"],
-        "publishDate": "2005-04-13",
-    },
-    {
-        "id": 12,
-        "title": "Spy x Family",
-        "rating": 8.6,
-        "status": "ongoing",
-        "language": "japanese",
-        "tags": ["Action", "Comedy", "Family"],
-        "publishDate": "2019-03-25",
-    },
-]
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Database configuration
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql://manga_user:manga_password@localhost:5432/manga_db"
+)
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
-def filter_and_sort_manga(
-    search_query="", status_filters=None, language_filters=None, sort_by="alphabetical"
+def get_db_connection():
+    """Get database connection"""
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        return None
+
+
+def init_db():
+    """Initialize database connection and test it"""
+    try:
+        conn = get_db_connection()
+        if conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            conn.close()
+            logger.info("Database connection successful")
+            return True
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+        return False
+
+
+def get_manga_list(
+    search_query="",
+    status_filters=None,
+    language_filters=None,
+    sort_by="alphabetical",
+    limit=None,
 ):
-    """Filter and sort manga based on provided criteria"""
+    """Get filtered and sorted manga list from database"""
     if status_filters is None:
         status_filters = []
     if language_filters is None:
         language_filters = []
 
-    filtered = SAMPLE_MANGA.copy()
+    conn = get_db_connection()
+    if not conn:
+        return []
 
-    # Apply search filter
-    if search_query:
-        search_query = search_query.lower().strip()
-        filtered = [
-            manga
-            for manga in filtered
-            if search_query in manga["title"].lower()
-            or any(search_query in tag.lower() for tag in manga["tags"])
-        ]
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            # Base query with joins
+            query = """
+                SELECT DISTINCT
+                    m.manga_id,
+                    COALESCE(m.name_english, m.name_romanized, m.name_original) as title,
+                    m.manga_status as status,
+                    m.started_publishing as publish_date,
+                    m.cover_path,
+                    COALESCE(
+                        ROUND((RANDOM() * 2 + 8)::NUMERIC, 1), 8.5
+                    ) as rating,
+                    ARRAY_AGG(DISTINCT t.tag_name) FILTER (WHERE t.tag_name IS NOT NULL) as tags,
+                    ARRAY_AGG(DISTINCT l.language_name_en) FILTER (WHERE l.language_name_en IS NOT NULL) as languages
+                FROM manga m
+                LEFT JOIN has h ON m.manga_id = h.manga_id
+                LEFT JOIN tag t ON h.tag_id = t.tag_id
+                LEFT JOIN supports s ON m.manga_id = s.manga_id
+                LEFT JOIN language l ON s.language_id = l.language_id
+                WHERE 1=1
+            """
 
-    # Apply status filter
-    if status_filters:
-        filtered = [manga for manga in filtered if manga["status"] in status_filters]
+            params = []
 
-    # Apply language filter
-    if language_filters:
-        filtered = [
-            manga for manga in filtered if manga["language"] in language_filters
-        ]
+            # Add search filter
+            if search_query:
+                query += """
+                    AND (
+                        LOWER(COALESCE(m.name_english, m.name_romanized, m.name_original)) LIKE LOWER(%s)
+                        OR EXISTS (
+                            SELECT 1 FROM has h2 
+                            JOIN tag t2 ON h2.tag_id = t2.tag_id 
+                            WHERE h2.manga_id = m.manga_id 
+                            AND LOWER(t2.tag_name) LIKE LOWER(%s)
+                        )
+                    )
+                """
+                search_param = f"%{search_query}%"
+                params.extend([search_param, search_param])
 
-    # Apply sorting
-    if sort_by == "alphabetical":
-        filtered.sort(key=lambda x: x["title"])
-    elif sort_by == "reverse-alphabetical":
-        filtered.sort(key=lambda x: x["title"], reverse=True)
-    elif sort_by == "date-newest":
-        filtered.sort(
-            key=lambda x: datetime.strptime(x["publishDate"], "%Y-%m-%d"), reverse=True
-        )
-    elif sort_by == "date-oldest":
-        filtered.sort(key=lambda x: datetime.strptime(x["publishDate"], "%Y-%m-%d"))
-    elif sort_by == "rating":
-        filtered.sort(key=lambda x: x["rating"], reverse=True)
+            # Add status filter
+            if status_filters:
+                placeholders = ",".join(["%s"] * len(status_filters))
+                query += f" AND m.manga_status IN ({placeholders})"
+                params.extend(status_filters)
 
-    return filtered
+            # Add language filter
+            if language_filters:
+                placeholders = ",".join(["%s"] * len(language_filters))
+                query += f"""
+                    AND EXISTS (
+                        SELECT 1 FROM supports s2 
+                        JOIN language l2 ON s2.language_id = l2.language_id
+                        WHERE s2.manga_id = m.manga_id 
+                        AND LOWER(l2.language_name_en) IN ({placeholders})
+                    )
+                """
+                params.extend([lang.lower() for lang in language_filters])
+
+            # Group by
+            query += """
+                GROUP BY m.manga_id, m.name_english, m.name_romanized, m.name_original,
+                         m.manga_status, m.started_publishing, m.cover_path
+            """
+
+            # Add sorting
+            if sort_by == "alphabetical":
+                query += " ORDER BY title ASC"
+            elif sort_by == "reverse-alphabetical":
+                query += " ORDER BY title DESC"
+            elif sort_by == "date-newest":
+                query += " ORDER BY m.started_publishing DESC NULLS LAST"
+            elif sort_by == "date-oldest":
+                query += " ORDER BY m.started_publishing ASC NULLS LAST"
+            elif sort_by == "rating":
+                query += " ORDER BY rating DESC"
+
+            # Add limit
+            if limit:
+                query += f" LIMIT {limit}"
+
+            cur.execute(query, params)
+            rows = cur.fetchall()
+
+            manga_list = []
+            for row in rows:
+                manga = {
+                    "id": row["manga_id"],
+                    "title": row["title"] or "Unknown Title",
+                    "rating": float(row["rating"]) if row["rating"] else 8.5,
+                    "status": row["status"] or "unknown",
+                    "language": row["languages"][0].lower()
+                    if row["languages"] and row["languages"][0]
+                    else "unknown",
+                    "tags": row["tags"] if row["tags"] and row["tags"][0] else [],
+                    "publishDate": row["publish_date"].strftime("%Y-%m-%d")
+                    if row["publish_date"]
+                    else "2020-01-01",
+                    "cover_path": row["cover_path"],
+                }
+                manga_list.append(manga)
+
+            return manga_list
+
+    except Exception as e:
+        logger.error(f"Error fetching manga list: {e}")
+        return []
+    finally:
+        conn.close()
 
 
 def get_section_manga(manga_list, section_type, limit=6):
@@ -184,7 +192,7 @@ def get_section_manga(manga_list, section_type, limit=6):
 @app.route("/")
 def index():
     """Main gallery page"""
-    manga_list = filter_and_sort_manga()
+    manga_list = get_manga_list()
 
     sections = {
         "trending": get_section_manga(manga_list, "trending"),
@@ -203,7 +211,7 @@ def search():
     language_filters = request.args.getlist("language")
     sort_by = request.args.get("sort", "alphabetical")
 
-    filtered_manga = filter_and_sort_manga(
+    filtered_manga = get_manga_list(
         search_query, status_filters, language_filters, sort_by
     )
 
@@ -233,12 +241,203 @@ def search():
 
 @app.route("/manga/<int:manga_id>")
 def manga_detail(manga_id):
-    """Individual manga details (placeholder for future implementation)"""
-    manga = next((m for m in SAMPLE_MANGA if m["id"] == manga_id), None)
-    if not manga:
-        return "Manga not found", 404
-    return jsonify(manga)
+    """Individual manga details"""
+    conn = get_db_connection()
+    if not conn:
+        return "Database connection error", 500
+
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            # Get manga details with tags and authors
+            cur.execute(
+                """
+                SELECT 
+                    m.*,
+                    ARRAY_AGG(DISTINCT t.tag_name) FILTER (WHERE t.tag_name IS NOT NULL) as tags,
+                    ARRAY_AGG(DISTINCT a.name_romanized || COALESCE(' (' || w.role || ')', '')) 
+                        FILTER (WHERE a.name_romanized IS NOT NULL) as authors,
+                    ARRAY_AGG(DISTINCT l.language_name_en) FILTER (WHERE l.language_name_en IS NOT NULL) as languages
+                FROM manga m
+                LEFT JOIN has h ON m.manga_id = h.manga_id
+                LEFT JOIN tag t ON h.tag_id = t.tag_id
+                LEFT JOIN writes w ON m.manga_id = w.manga_id
+                LEFT JOIN author a ON w.author_id = a.author_id
+                LEFT JOIN supports s ON m.manga_id = s.manga_id
+                LEFT JOIN language l ON s.language_id = l.language_id
+                WHERE m.manga_id = %s
+                GROUP BY m.manga_id
+            """,
+                (manga_id,),
+            )
+
+            manga = cur.fetchone()
+            if not manga:
+                return "Manga not found", 404
+
+            # Get chapters
+            cur.execute(
+                """
+                SELECT c.*, 
+                       ARRAY_AGG(DISTINCT l.language_name_en) FILTER (WHERE l.language_name_en IS NOT NULL) as available_languages
+                FROM chapter c
+                LEFT JOIN translated_to tt ON c.chapter_id = tt.chapter_id
+                LEFT JOIN language l ON tt.language_id = l.language_id
+                WHERE c.manga_id = %s
+                GROUP BY c.chapter_id
+                ORDER BY c.chapter_num
+            """,
+                (manga_id,),
+            )
+
+            chapters = cur.fetchall()
+
+            manga_data = {
+                "id": manga["manga_id"],
+                "title": manga["name_english"]
+                or manga["name_romanized"]
+                or manga["name_original"],
+                "original_title": manga["name_original"],
+                "romanized_title": manga["name_romanized"],
+                "status": manga["manga_status"],
+                "started_publishing": manga["started_publishing"].strftime("%Y-%m-%d")
+                if manga["started_publishing"]
+                else None,
+                "ended_publishing": manga["ended_publishing"].strftime("%Y-%m-%d")
+                if manga["ended_publishing"]
+                else None,
+                "cover_path": manga["cover_path"],
+                "tags": manga["tags"] if manga["tags"] and manga["tags"][0] else [],
+                "authors": manga["authors"]
+                if manga["authors"] and manga["authors"][0]
+                else [],
+                "languages": manga["languages"]
+                if manga["languages"] and manga["languages"][0]
+                else [],
+                "chapters": [dict(chapter) for chapter in chapters] if chapters else [],
+            }
+
+            return jsonify(manga_data)
+
+    except Exception as e:
+        logger.error(f"Error fetching manga details: {e}")
+        return "Internal server error", 500
+    finally:
+        conn.close()
+
+
+@app.route("/images/<path:image_path>")
+def serve_image(image_path):
+    """Serve images from the data directory"""
+    try:
+        # Ensure the path is safe (no directory traversal)
+        if ".." in image_path or image_path.startswith("/"):
+            abort(404)
+
+        full_path = os.path.join(DATA_DIR, image_path)
+
+        # Check if file exists and is within DATA_DIR
+        if not os.path.exists(full_path) or not os.path.abspath(full_path).startswith(
+            os.path.abspath(DATA_DIR)
+        ):
+            abort(404)
+
+        # Get the directory and filename
+        directory = os.path.dirname(full_path)
+        filename = os.path.basename(full_path)
+
+        return send_from_directory(directory, filename)
+
+    except Exception as e:
+        logger.error(f"Error serving image {image_path}: {e}")
+        abort(404)
+
+
+@app.route("/manga/<int:manga_id>/cover")
+def manga_cover(manga_id):
+    """Get manga cover image"""
+    conn = get_db_connection()
+    if not conn:
+        abort(500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT cover_path FROM manga WHERE manga_id = %s", (manga_id,))
+            result = cur.fetchone()
+
+            if not result or not result[0]:
+                abort(404)
+
+            return serve_image(result[0])
+
+    except Exception as e:
+        logger.error(f"Error fetching cover for manga {manga_id}: {e}")
+        abort(404)
+    finally:
+        conn.close()
+
+
+@app.route("/chapter/<int:chapter_id>/page/<int:page_num>")
+def chapter_page(chapter_id, page_num):
+    """Get specific page from a chapter"""
+    language_id = request.args.get("lang", "en")
+
+    conn = get_db_connection()
+    if not conn:
+        abort(500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT page_path FROM pages 
+                WHERE chapter_id = %s AND page_num = %s AND language_id = %s
+            """,
+                (chapter_id, page_num, language_id),
+            )
+
+            result = cur.fetchone()
+
+            if not result or not result[0]:
+                abort(404)
+
+            return serve_image(result[0])
+
+    except Exception as e:
+        logger.error(f"Error fetching page {page_num} for chapter {chapter_id}: {e}")
+        abort(404)
+    finally:
+        conn.close()
+
+
+@app.route("/health")
+def health():
+    """Health check endpoint"""
+    try:
+        conn = get_db_connection()
+        if conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            conn.close()
+            return {"status": "healthy", "database": "connected"}, 200
+        else:
+            return {"status": "unhealthy", "database": "disconnected"}, 503
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}, 503
+
+
+# Initialize database connection on startup
+@app.before_request
+def before_request():
+    """Initialize database before first request"""
+    if not hasattr(app, "db_initialized"):
+        init_db()
+        app.db_initialized = True
 
 
 if __name__ == "__main__":
+    # Initialize database
+    if not init_db():
+        logger.error("Failed to initialize database. Exiting.")
+        exit(1)
+
     app.run(debug=True, host="0.0.0.0")
