@@ -62,7 +62,7 @@ def dashboard():
 
             # Recent activity
             cur.execute("""
-                SELECT name_english, name_romanized, name_original, created_at
+                SELECT manga_id, name_english, name_romanized, name_original, created_at
                 FROM manga 
                 ORDER BY created_at DESC 
                 LIMIT 5

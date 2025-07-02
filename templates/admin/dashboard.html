@@ -48,8 +48,8 @@
                 <tbody>
                     {% for manga in recent_manga %}
                     <tr>
-                        <td>{{ manga[0] or manga[1] or manga[2] or 'Untitled' }}</td>
-                        <td>{{ manga[3].strftime('%Y-%m-%d %H:%M') if manga[3] else 'Unknown' }}</td>
+                        <td>{{ manga[1] or manga[2] or manga[3] or 'Untitled' }}</td>
+                        <td>{{ manga[4].strftime('%Y-%m-%d %H:%M') if manga[4] else 'Unknown' }}</td>
                         <td>
                             <a href="{{ url_for('manga_edit', manga_id=manga[0]) }}" class="btn btn-small btn-primary">Edit</a>
                         </td>
