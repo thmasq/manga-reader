@@ -17,21 +17,9 @@
         {% endif %}
     </section>
 {% else %}
-    <!-- Default Sections -->
-    {% if sections.trending %}
-        <section>
-            <h2 class="section-title">🔥 Trending Now</h2>
-            <div class="manga-grid">
-                {% for manga in sections.trending %}
-                    {% include 'components/manga_card.html' %}
-                {% endfor %}
-            </div>
-        </section>
-    {% endif %}
-
     {% if sections.just_published %}
         <section>
-            <h2 class="section-title">📚 Just Published</h2>
+            <h2 class="section-title">Just Published</h2>
             <div class="manga-grid">
                 {% for manga in sections.just_published %}
                     {% include 'components/manga_card.html' %}
