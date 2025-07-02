@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if author %}Edit Author{% else %}New Author{% endif %} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if author %}Edit Author{% else %}New Author{% endif %}</h1>
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-body">
+            <div class="form-group">
+                <label for="name_romanized" class="form-label">Name (Romanized)</label>
+                <input type="text" id="name_romanized" name="name_romanized" class="form-input" required
+                       value="{{ author.name_romanized if author else '' }}"
+                       placeholder="e.g., Kishimoto Masashi">
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">{% if author %}Update Author{% else %}Create Author{% endif %}</button>
+        <a href="{{ url_for('author_list') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

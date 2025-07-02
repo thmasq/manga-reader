@@ -1,0 +1,210 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if manga %}Edit Manga{% else %}New Manga{% endif %} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if manga %}Edit Manga{% else %}New Manga{% endif %}</h1>
+    <p class="page-subtitle">{% if manga %}Update manga information{% else %}Add a new manga to your collection{% endif %}</p>
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Basic Information</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="name_english" class="form-label">English Title</label>
+                <input type="text" id="name_english" name="name_english" class="form-input" 
+                       value="{{ manga.name_english if manga else '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="name_romanized" class="form-label">Romanized Title</label>
+                <input type="text" id="name_romanized" name="name_romanized" class="form-input" 
+                       value="{{ manga.name_romanized if manga else '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="name_original" class="form-label">Original Title</label>
+                <input type="text" id="name_original" name="name_original" class="form-input" 
+                       value="{{ manga.name_original if manga else '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="manga_status" class="form-label">Status</label>
+                <select id="manga_status" name="manga_status" class="form-select">
+                    <option value="unknown" {{ 'selected' if not manga or manga.manga_status == 'unknown' else '' }}>Unknown</option>
+                    <option value="ongoing" {{ 'selected' if manga and manga.manga_status == 'ongoing' else '' }}>Ongoing</option>
+                    <option value="completed" {{ 'selected' if manga and manga.manga_status == 'completed' else '' }}>Completed</option>
+                    <option value="hiatus" {{ 'selected' if manga and manga.manga_status == 'hiatus' else '' }}>On Hiatus</option>
+                    <option value="cancelled" {{ 'selected' if manga and manga.manga_status == 'cancelled' else '' }}>Cancelled</option>
+                </select>
+            </div>
+            
+            <div class="flex gap-2">
+                <div class="form-group" style="flex: 1;">
+                    <label for="started_publishing" class="form-label">Started Publishing</label>
+                    <input type="date" id="started_publishing" name="started_publishing" class="form-input" 
+                           value="{{ manga.started_publishing.strftime('%Y-%m-%d') if manga and manga.started_publishing else '' }}">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="ended_publishing" class="form-label">Ended Publishing</label>
+                    <input type="date" id="ended_publishing" name="ended_publishing" class="form-input" 
+                           value="{{ manga.ended_publishing.strftime('%Y-%m-%d') if manga and manga.ended_publishing else '' }}">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="cover_path" class="form-label">Cover Image Path</label>
+                <input type="text" id="cover_path" name="cover_path" class="form-input" 
+                       placeholder="e.g., covers/manga-name.jpg"
+                       value="{{ manga.cover_path if manga else '' }}">
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">{% if manga %}Update Manga{% else %}Create Manga{% endif %}</button>
+        <a href="{{ url_for('manga_list') }}" class="btn btn-secondary">Cancel</a>
+        {% if manga %}
+            <a href="{{ url_for('chapter_list', manga_id=manga.manga_id) }}" class="btn btn-secondary">View Chapters</a>
+            <a href="{{ url_for('bulk_create_chapters', manga_id=manga.manga_id) }}" class="btn btn-secondary">Bulk Add Chapters</a>
+        {% endif %}
+    </div>
+</form>
+
+{% if manga %}
+    <!-- Tags Management -->
+    <div class="relationship-section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Tags</h2>
+            </div>
+            <div class="card-body">
+                <div class="relationship-list">
+                    {% for tag in manga_tags %}
+                        <div class="relationship-tag">
+                            {{ tag.tag_name }}
+                            <form method="POST" action="{{ url_for('manga_remove_tag', manga_id=manga.manga_id, tag_id=tag.tag_id) }}" style="display: inline;">
+                                <button type="submit" class="relationship-remove" title="Remove tag">×</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <form method="POST" action="{{ url_for('manga_add_tag', manga_id=manga.manga_id) }}" class="add-relationship-form">
+                    <div class="search-dropdown">
+                        <input type="text" id="tag-search" placeholder="Search tags..." class="form-input">
+                        <div id="tag-results" class="search-results" style="display: none;"></div>
+                        <input type="hidden" id="tag_id" name="tag_id">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Tag</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Authors Management -->
+    <div class="relationship-section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Authors</h2>
+            </div>
+            <div class="card-body">
+                <div class="relationship-list">
+                    {% for author in manga_authors %}
+                        <div class="relationship-tag">
+                            {{ author.name_romanized }} ({{ author.role }})
+                            <form method="POST" action="{{ url_for('manga_remove_author', manga_id=manga.manga_id, author_id=author.author_id) }}" style="display: inline;">
+                                <button type="submit" class="relationship-remove" title="Remove author">×</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <form method="POST" action="{{ url_for('manga_add_author', manga_id=manga.manga_id) }}" class="add-relationship-form">
+                    <div class="search-dropdown">
+                        <input type="text" id="author-search" placeholder="Search authors..." class="form-input">
+                        <div id="author-results" class="search-results" style="display: none;"></div>
+                        <input type="hidden" id="author_id" name="author_id">
+                    </div>
+                    <div class="form-group">
+                        <select name="role" class="form-select">
+                            <option value="author">Author</option>
+                            <option value="artist">Artist</option>
+                            <option value="story">Story</option>
+                            <option value="art">Art</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Author</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Languages Management -->
+    <div class="relationship-section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Supported Languages</h2>
+            </div>
+            <div class="card-body">
+                <div class="relationship-list">
+                    {% for lang in manga_languages %}
+                        <div class="relationship-tag">
+                            {{ lang.language_name_en }}
+                            <form method="POST" action="{{ url_for('manga_remove_language', manga_id=manga.manga_id, language_id=lang.language_id) }}" style="display: inline;">
+                                <button type="submit" class="relationship-remove" title="Remove language">×</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <form method="POST" action="{{ url_for('manga_add_language', manga_id=manga.manga_id) }}" class="add-relationship-form">
+                    <div class="form-group">
+                        <select name="language_id" class="form-select" required>
+                            <option value="">Select Language</option>
+                            <option value="en">English</option>
+                            <option value="ja">Japanese</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="ko">Korean</option>
+                            <option value="zh-CN">Chinese (Simplified)</option>
+                            <option value="zh-TW">Chinese (Traditional)</option>
+                            <option value="it">Italian</option>
+                            <option value="ru">Russian</option>
+                            <option value="ar">Arabic</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Language</button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if manga %}
+<script>
+    // Setup tag search
+    setupSearchDropdown('tag-search', 'tag-results', '/api/search/tags', function(tag) {
+        document.getElementById('tag_id').value = tag.id;
+        document.getElementById('tag-search').value = tag.name;
+        document.getElementById('tag-results').style.display = 'none';
+    });
+    
+    // Setup author search
+    setupSearchDropdown('author-search', 'author-results', '/api/search/authors', function(author) {
+        document.getElementById('author_id').value = author.id;
+        document.getElementById('author-search').value = author.name;
+        document.getElementById('author-results').style.display = 'none';
+    });
+</script>
+{% endif %}
+{% endblock %}

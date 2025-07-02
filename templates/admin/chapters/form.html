@@ -1,0 +1,87 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if chapter and chapter.chapter_id %}Edit Chapter{% else %}New Chapter{% endif %} - {{ manga.name_english or manga.name_romanized or manga.name_original or 'Unknown' }} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if chapter and chapter.chapter_id %}Edit Chapter{% else %}New Chapter{% endif %}</h1>
+    <p class="page-subtitle">{{ manga.name_english or manga.name_romanized or manga.name_original or 'Unknown' }}</p>
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Chapter Information</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="chapter_num" class="form-label">Chapter Number</label>
+                <input type="number" step="0.01" id="chapter_num" name="chapter_num" class="form-input" required
+                       value="{{ chapter.chapter_num if chapter else '' }}"
+                       placeholder="e.g., 1, 1.5, 42">
+                <small style="color: var(--gray-500); font-size: 0.75rem;">
+                    Decimals allowed for special chapters (e.g., 1.5 for chapter 1.5)
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label for="page_count" class="form-label">Page Count (Optional)</label>
+                <input type="number" id="page_count" name="page_count" class="form-input" min="0"
+                       value="{{ chapter.page_count if chapter else '' }}"
+                       placeholder="e.g., 20">
+                <small style="color: var(--gray-500); font-size: 0.75rem;">
+                    Leave empty if unknown. Will be automatically calculated when pages are added.
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">
+            {% if chapter and chapter.chapter_id %}Update Chapter{% else %}Create Chapter{% endif %}
+        </button>
+        <a href="{{ url_for('chapter_list', manga_id=manga.manga_id) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+{% if chapter and chapter.chapter_id %}
+    <!-- Translation Management -->
+    <div class="relationship-section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Translations</h2>
+            </div>
+            <div class="card-body">
+                <p style="color: var(--gray-500); margin-bottom: 1rem;">
+                    Manage which languages this chapter is translated to. Note: Only languages supported by the manga can be added.
+                </p>
+                
+                <!-- Add translation form would go here -->
+                <div class="text-center" style="padding: 2rem; color: var(--gray-500);">
+                    <p>Translation management coming soon...</p>
+                    <p><small>For now, translations must be managed through the database directly.</small></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Management -->
+    <div class="relationship-section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Pages</h2>
+            </div>
+            <div class="card-body">
+                <p style="color: var(--gray-500); margin-bottom: 1rem;">
+                    Manage individual pages for this chapter.
+                </p>
+                
+                <div class="text-center" style="padding: 2rem; color: var(--gray-500);">
+                    <p>Page management coming soon...</p>
+                    <p><small>For now, pages must be managed through the database directly.</small></p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if page %}Edit Page{% else %}New Page{% endif %} - Chapter {{ chapter.chapter_num }} ({{ chapter.language_name_en }}) - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if page %}Edit Page{% else %}New Page{% endif %}</h1>
+    <p class="page-subtitle">Chapter {{ chapter.chapter_num }} - {{ chapter.name_english or chapter.name_romanized or chapter.name_original or 'Unknown' }} ({{ chapter.language_name_en }})</p>
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Page Information</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="page_num" class="form-label">Page Number</label>
+                <input type="number" id="page_num" name="page_num" class="form-input" required min="1"
+                       value="{{ page.page_num if page else next_page_num }}"
+                       placeholder="e.g., 1, 2, 3">
+                <small style="color: var(--gray-500); font-size: 0.75rem;">
+                    Page numbers should be sequential starting from 1.
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label for="page_path" class="form-label">Image Path</label>
+                <input type="text" id="page_path" name="page_path" class="form-input"
+                       value="{{ page.page_path if page else '' }}"
+                       placeholder="e.g., chapters/chapter-1/page-01.jpg">
+                <small style="color: var(--gray-500); font-size: 0.75rem;">
+                    Path relative to the data directory. Leave empty if no image yet.
+                </small>
+            </div>
+            
+            {% if page and page.page_path %}
+            <div class="form-group">
+                <label class="form-label">Current Image Preview</label>
+                <div style="max-width: 300px; border: 1px solid var(--gray-300); border-radius: 0.375rem; padding: 0.5rem;">
+                    <img src="{{ url_for('serve_image', image_path=page.page_path) }}" 
+                         alt="Page {{ page.page_num }} preview"
+                         style="max-width: 100%; height: auto; border-radius: 0.375rem;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div style="display: none; text-align: center; padding: 2rem; color: var(--gray-500);">
+                        Preview not available
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">
+            {% if page %}Update Page{% else %}Create Page{% endif %}
+        </button>
+        <a href="{{ url_for('page_list', chapter_id=chapter.chapter_id, language_id=language_id) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

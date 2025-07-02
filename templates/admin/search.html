@@ -1,0 +1,150 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Search - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Advanced Search</h1>
+    <p class="page-subtitle">Search across manga, authors, and tags</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Search Parameters</h2>
+    </div>
+    <div class="card-body">
+        <form method="GET">
+            <div class="flex gap-2 items-end">
+                <div class="form-group" style="flex: 2;">
+                    <label for="q" class="form-label">Search Query</label>
+                    <input type="text" id="q" name="q" class="form-input" 
+                           value="{{ query }}" placeholder="Enter search terms..."
+                           minlength="2" required>
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="type" class="form-label">Search In</label>
+                    <select id="type" name="type" class="form-select">
+                        <option value="all" {{ 'selected' if entity_type == 'all' else '' }}>All</option>
+                        <option value="manga" {{ 'selected' if entity_type == 'manga' else '' }}>Manga Only</option>
+                        <option value="author" {{ 'selected' if entity_type == 'author' else '' }}>Authors Only</option>
+                        <option value="tag" {{ 'selected' if entity_type == 'tag' else '' }}>Tags Only</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if query %}
+    <div class="page-header">
+        <h2 class="page-title" style="font-size: 1.25rem;">Search Results for "{{ query }}"</h2>
+    </div>
+
+    {% if results.manga %}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📚 Manga ({{ results.manga|length }})</h3>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for manga in results.manga %}
+                        <tr>
+                            <td>
+                                <strong>{{ manga.name_english or manga.name_romanized or manga.name_original or 'Untitled' }}</strong>
+                                {% if manga.name_english and (manga.name_romanized or manga.name_original) %}
+                                    <br><small style="color: var(--gray-500);">{{ manga.name_romanized or manga.name_original }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="relationship-tag">{{ manga.manga_status.title() if manga.manga_status else 'Unknown' }}</span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('manga_edit', manga_id=manga.manga_id) }}" class="btn btn-small btn-primary">Edit</a>
+                                <a href="{{ url_for('chapter_list', manga_id=manga.manga_id) }}" class="btn btn-small btn-secondary">Chapters</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if results.authors %}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">✍️ Authors ({{ results.authors|length }})</h3>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for author in results.authors %}
+                        <tr>
+                            <td><strong>{{ author.name_romanized }}</strong></td>
+                            <td>
+                                <a href="{{ url_for('author_edit', author_id=author.author_id) }}" class="btn btn-small btn-primary">Edit</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if results.tags %}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">🏷️ Tags ({{ results.tags|length }})</h3>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Tag Name</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tag in results.tags %}
+                        <tr>
+                            <td><strong>{{ tag.tag_name }}</strong></td>
+                            <td>
+                                <a href="{{ url_for('tag_edit', tag_id=tag.tag_id) }}" class="btn btn-small btn-primary">Edit</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if not results.manga and not results.authors and not results.tags %}
+        <div class="card">
+            <div class="card-body text-center">
+                <p style="color: var(--gray-500);">No results found for "{{ query }}"</p>
+                <p><small>Try different search terms or check spelling.</small></p>
+            </div>
+        </div>
+    {% endif %}
+
+{% endif %}
+{% endblock %}

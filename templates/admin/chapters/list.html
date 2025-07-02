@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Chapters - {{ manga.name_english or manga.name_romanized or manga.name_original or 'Unknown' }} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="page-title">Chapters</h1>
+            <p class="page-subtitle">{{ manga.name_english or manga.name_romanized or manga.name_original or 'Unknown' }}</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('chapter_new', manga_id=manga.manga_id) }}" class="btn btn-primary">Add New Chapter</a>
+            <a href="{{ url_for('manga_edit', manga_id=manga.manga_id) }}" class="btn btn-secondary">Back to Manga</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Chapter List</h2>
+    </div>
+    <div class="card-body">
+        {% if chapters %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Chapter #</th>
+                        <th>Pages</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for chapter in chapters %}
+                    <tr>
+                        <td><strong>Chapter {{ chapter.chapter_num }}</strong></td>
+                        <td>{{ chapter.page_count or 0 }} pages</td>
+                        <td>{{ chapter.created_at.strftime('%Y-%m-%d %H:%M') if chapter.created_at else 'Unknown' }}</td>
+                        <td>
+                            <a href="{{ url_for('chapter_edit', chapter_id=chapter.chapter_id) }}" class="btn btn-small btn-primary">Edit</a>
+                            <form method="POST" action="{{ url_for('chapter_delete', chapter_id=chapter.chapter_id) }}" style="display: inline;" 
+                                  onsubmit="return confirm('Are you sure you want to delete this chapter? This will also delete all associated pages.')">
+                                <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-center">No chapters found. <a href="{{ url_for('chapter_new', manga_id=manga.manga_id) }}">Add the first chapter</a>!</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

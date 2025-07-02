@@ -1,0 +1,91 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Bulk Create Chapters - {{ manga.name_english or manga.name_romanized or manga.name_original or 'Unknown' }} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Bulk Create Chapters</h1>
+    <p class="page-subtitle">{{ manga.name_english or manga.name_romanized or manga.name_original or 'Unknown' }}</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Chapter Range</h2>
+    </div>
+    <div class="card-body">
+        <div style="background-color: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 0.375rem; padding: 1rem; margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--gray-700); font-size: 0.875rem; font-weight: 600;">⚠️ Important Notes:</h3>
+            <ul style="margin: 0; padding-left: 1rem; font-size: 0.875rem; color: var(--gray-600);">
+                <li>This will create chapters with sequential numbers in the specified range</li>
+                <li>Existing chapters will be skipped automatically</li>
+                <li>You can add translations and pages to each chapter individually afterwards</li>
+                <li>This operation cannot be easily undone</li>
+            </ul>
+        </div>
+        
+        <form method="POST">
+            <div class="flex gap-2">
+                <div class="form-group" style="flex: 1;">
+                    <label for="start_chapter" class="form-label">Start Chapter</label>
+                    <input type="number" id="start_chapter" name="start_chapter" class="form-input" 
+                           required min="1" value="1"
+                           placeholder="e.g., 1">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="end_chapter" class="form-label">End Chapter</label>
+                    <input type="number" id="end_chapter" name="end_chapter" class="form-input" 
+                           required min="1" value="10"
+                           placeholder="e.g., 100">
+                </div>
+            </div>
+            
+            <div class="flex gap-2 mt-2">
+                <button type="submit" class="btn btn-primary" 
+                        onclick="return confirm('Are you sure you want to create chapters in this range? This action will create multiple database entries.')">
+                    Create Chapters
+                </button>
+                <a href="{{ url_for('chapter_list', manga_id=manga.manga_id) }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Preview</h2>
+    </div>
+    <div class="card-body">
+        <p style="color: var(--gray-600); margin-bottom: 0.5rem;">The following chapters will be created:</p>
+        <div id="preview" style="font-family: monospace; background-color: var(--gray-50); padding: 1rem; border-radius: 0.375rem; color: var(--gray-700);">
+            Chapters 1 to 10 (adjust the range above to see preview)
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startInput = document.getElementById('start_chapter');
+    const endInput = document.getElementById('end_chapter');
+    const preview = document.getElementById('preview');
+    
+    function updatePreview() {
+        const start = parseInt(startInput.value) || 1;
+        const end = parseInt(endInput.value) || 1;
+        
+        if (start > end) {
+            preview.textContent = 'Invalid range: Start chapter must be less than or equal to end chapter';
+            preview.style.color = 'var(--error-color)';
+        } else {
+            const count = end - start + 1;
+            preview.textContent = `Chapters ${start} to ${end} (${count} chapters total)`;
+            preview.style.color = 'var(--gray-700)';
+        }
+    }
+    
+    startInput.addEventListener('input', updatePreview);
+    endInput.addEventListener('input', updatePreview);
+    updatePreview();
+});
+</script>
+{% endblock %}

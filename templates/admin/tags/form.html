@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if tag %}Edit Tag{% else %}New Tag{% endif %} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if tag %}Edit Tag{% else %}New Tag{% endif %}</h1>
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-body">
+            <div class="form-group">
+                <label for="tag_name" class="form-label">Tag Name</label>
+                <input type="text" id="tag_name" name="tag_name" class="form-input" required
+                       value="{{ tag.tag_name if tag else '' }}"
+                       placeholder="e.g., Action, Romance, School Life">
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">{% if tag %}Update Tag{% else %}Create Tag{% endif %}</button>
+        <a href="{{ url_for('tag_list') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

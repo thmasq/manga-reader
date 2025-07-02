@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Translations - Chapter {{ chapter.chapter_num }} - {{ chapter.name_english or chapter.name_romanized or chapter.name_original or 'Unknown' }} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="page-title">Chapter {{ chapter.chapter_num }} Translations</h1>
+            <p class="page-subtitle">{{ chapter.name_english or chapter.name_romanized or chapter.name_original or 'Unknown' }}</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('chapter_list', manga_id=chapter.manga_id) }}" class="btn btn-secondary">Back to Chapters</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Existing Translations</h2>
+    </div>
+    <div class="card-body">
+        {% if translations %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Language</th>
+                        <th>Translation Date</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for translation in translations %}
+                    <tr>
+                        <td><strong>{{ translation.language_name_en }}</strong></td>
+                        <td>{{ translation.translation_date.strftime('%Y-%m-%d') if translation.translation_date else 'Unknown' }}</td>
+                        <td>
+                            <span class="relationship-tag {% if translation.is_complete %}status-completed{% else %}status-ongoing{% endif %}">
+                                {{ 'Complete' if translation.is_complete else 'In Progress' }}
+                            </span>
+                        </td>
+                        <td>{{ translation.translator_notes or '-' }}</td>
+                        <td>
+                            <a href="{{ url_for('page_list', chapter_id=chapter.chapter_id, language_id=translation.language_id) }}" 
+                               class="btn btn-small btn-primary">Manage Pages</a>
+                            <form method="POST" action="{{ url_for('chapter_remove_translation', chapter_id=chapter.chapter_id, language_id=translation.language_id) }}" style="display: inline;" 
+                                  onsubmit="return confirm('Are you sure you want to remove this translation? This will also delete all associated pages.')">
+                                <button type="submit" class="btn btn-small btn-danger">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-center">No translations found for this chapter.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if available_languages %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Add New Translation</h2>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('chapter_add_translation', chapter_id=chapter.chapter_id) }}">
+            <div class="flex gap-2 items-end">
+                <div class="form-group" style="flex: 1;">
+                    <label for="language_id" class="form-label">Language</label>
+                    <select id="language_id" name="language_id" class="form-select" required>
+                        <option value="">Select Language</option>
+                        {% for lang in available_languages %}
+                            <option value="{{ lang.language_id }}">{{ lang.language_name_en }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="is_complete">
+                        <span class="form-label" style="margin: 0;">Mark as Complete</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Translation</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% else %}
+    <div class="card">
+        <div class="card-body text-center">
+            <p style="color: var(--gray-500);">All supported languages for this manga already have translations.</p>
+            <p><small>To add more languages, go to the manga edit page and add language support first.</small></p>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

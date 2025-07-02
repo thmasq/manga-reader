@@ -1,0 +1,65 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Dashboard - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Overview of your manga collection</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.manga_count }}</div>
+        <div class="stat-label">Total Manga</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.chapter_count }}</div>
+        <div class="stat-label">Total Chapters</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.author_count }}</div>
+        <div class="stat-label">Authors</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.tag_count }}</div>
+        <div class="stat-label">Tags</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.page_count }}</div>
+        <div class="stat-label">Total Pages</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Manga</h2>
+    </div>
+    <div class="card-body">
+        {% if recent_manga %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Added</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for manga in recent_manga %}
+                    <tr>
+                        <td>{{ manga[0] or manga[1] or manga[2] or 'Untitled' }}</td>
+                        <td>{{ manga[3].strftime('%Y-%m-%d %H:%M') if manga[3] else 'Unknown' }}</td>
+                        <td>
+                            <a href="{{ url_for('manga_edit', manga_id=manga[0]) }}" class="btn btn-small btn-primary">Edit</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-center">No manga found. <a href="{{ url_for('manga_new') }}">Add your first manga</a>!</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
