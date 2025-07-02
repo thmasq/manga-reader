@@ -77,75 +77,159 @@
 </form>
 
 {% if manga %}
-    <!-- Tags Management -->
+    <!-- Enhanced Tags Management -->
     <div class="relationship-section">
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Tags</h2>
+                <div class="flex justify-between items-center">
+                    <h2 class="card-title">Tags</h2>
+                    <button onclick="toggleTagQuickAdd()" class="btn btn-success btn-small" id="tag-toggle-btn">
+                        🏷️ Quick Add
+                    </button>
+                </div>
             </div>
             <div class="card-body">
-                <div class="relationship-list">
+                <!-- Quick Add Form for Tags -->
+                <div id="tag-quick-add-form" class="quick-add-section" style="display: none;">
+                    <div class="quick-add-header">
+                        <h3>Quick Add Tags</h3>
+                        <p>Type tag names separated by commas or add them one by one</p>
+                    </div>
+                    <form onsubmit="quickAddTags(event)" class="quick-add-form">
+                        <div class="flex gap-2 items-end">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="tag-bulk-input" class="form-label">Tag Names</label>
+                                <input type="text" id="tag-bulk-input" name="tag_names" class="form-input" 
+                                       placeholder="e.g., Action, Romance, School Life"
+                                       title="Separate multiple tags with commas">
+                            </div>
+                            <button type="submit" class="btn btn-success" id="tag-quick-submit-btn">
+                                ➕ Add Tags
+                            </button>
+                            <button type="button" onclick="clearTagQuickForm()" class="btn btn-secondary">
+                                🔄 Clear
+                            </button>
+                            <button type="button" onclick="toggleTagQuickAdd()" class="btn btn-secondary">
+                                ❌ Close
+                            </button>
+                        </div>
+                        <div id="tag-quick-add-status" class="mt-2"></div>
+                    </form>
+                </div>
+
+                <!-- Current Tags -->
+                <div class="relationship-list" id="current-tags">
                     {% for tag in manga_tags %}
-                        <div class="relationship-tag">
+                        <div class="relationship-tag" data-tag-id="{{ tag.tag_id }}">
                             {{ tag.tag_name }}
-                            <form method="POST" action="{{ url_for('manga_remove_tag', manga_id=manga.manga_id, tag_id=tag.tag_id) }}" style="display: inline;">
-                                <button type="submit" class="relationship-remove" title="Remove tag">×</button>
-                            </form>
+                            <button type="button" class="relationship-remove" 
+                                    onclick="removeTag({{ tag.tag_id }}, '{{ tag.tag_name }}')" 
+                                    title="Remove tag">×</button>
                         </div>
                     {% endfor %}
                 </div>
                 
-                <form method="POST" action="{{ url_for('manga_add_tag', manga_id=manga.manga_id) }}" class="add-relationship-form">
-                    <div class="search-dropdown">
-                        <input type="text" id="tag-search" placeholder="Search tags..." class="form-input">
-                        <div id="tag-results" class="search-results" style="display: none;"></div>
-                        <input type="hidden" id="tag_id" name="tag_id">
+                <!-- Traditional Search Add -->
+                <div class="search-add-section">
+                    <h4 style="margin: 1rem 0 0.5rem 0; font-size: 0.875rem; color: var(--gray-600);">Add Existing Tag</h4>
+                    <div class="add-relationship-form">
+                        <div class="search-dropdown">
+                            <input type="text" id="tag-search" placeholder="Search existing tags..." class="form-input">
+                            <div id="tag-results" class="search-results" style="display: none;"></div>
+                            <input type="hidden" id="selected_tag_id">
+                        </div>
+                        <button type="button" onclick="addExistingTag()" class="btn btn-primary">Add Existing</button>
                     </div>
-                    <button type="submit" class="btn btn-primary">Add Tag</button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- Authors Management -->
+    <!-- Enhanced Authors Management -->
     <div class="relationship-section">
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Authors</h2>
+                <div class="flex justify-between items-center">
+                    <h2 class="card-title">Authors</h2>
+                    <button onclick="toggleAuthorQuickAdd()" class="btn btn-success btn-small" id="author-toggle-btn">
+                        ✍️ Quick Add
+                    </button>
+                </div>
             </div>
             <div class="card-body">
-                <div class="relationship-list">
+                <!-- Quick Add Form for Authors -->
+                <div id="author-quick-add-form" class="quick-add-section" style="display: none;">
+                    <div class="quick-add-header">
+                        <h3>Quick Add Author</h3>
+                        <p>Add a new author or artist to this manga</p>
+                    </div>
+                    <form onsubmit="quickAddAuthor(event)" class="quick-add-form">
+                        <div class="flex gap-2 items-end">
+                            <div class="form-group" style="flex: 2;">
+                                <label for="author-name-input" class="form-label">Author Name (Romanized)</label>
+                                <input type="text" id="author-name-input" name="author_name" class="form-input" 
+                                       placeholder="e.g., Kishimoto Masashi" required>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="author-role-input" class="form-label">Role</label>
+                                <select id="author-role-input" name="role" class="form-select">
+                                    <option value="author">Author</option>
+                                    <option value="artist">Artist</option>
+                                    <option value="story">Story</option>
+                                    <option value="art">Art</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success" id="author-quick-submit-btn">
+                                ➕ Add Author
+                            </button>
+                            <button type="button" onclick="clearAuthorQuickForm()" class="btn btn-secondary">
+                                🔄 Clear
+                            </button>
+                            <button type="button" onclick="toggleAuthorQuickAdd()" class="btn btn-secondary">
+                                ❌ Close
+                            </button>
+                        </div>
+                        <div id="author-quick-add-status" class="mt-2"></div>
+                    </form>
+                </div>
+
+                <!-- Current Authors -->
+                <div class="relationship-list" id="current-authors">
                     {% for author in manga_authors %}
-                        <div class="relationship-tag">
+                        <div class="relationship-tag" data-author-id="{{ author.author_id }}">
                             {{ author.name_romanized }} ({{ author.role }})
-                            <form method="POST" action="{{ url_for('manga_remove_author', manga_id=manga.manga_id, author_id=author.author_id) }}" style="display: inline;">
-                                <button type="submit" class="relationship-remove" title="Remove author">×</button>
-                            </form>
+                            <button type="button" class="relationship-remove" 
+                                    onclick="removeAuthor({{ author.author_id }}, '{{ author.name_romanized }}')" 
+                                    title="Remove author">×</button>
                         </div>
                     {% endfor %}
                 </div>
                 
-                <form method="POST" action="{{ url_for('manga_add_author', manga_id=manga.manga_id) }}" class="add-relationship-form">
-                    <div class="search-dropdown">
-                        <input type="text" id="author-search" placeholder="Search authors..." class="form-input">
-                        <div id="author-results" class="search-results" style="display: none;"></div>
-                        <input type="hidden" id="author_id" name="author_id">
+                <!-- Traditional Search Add -->
+                <div class="search-add-section">
+                    <h4 style="margin: 1rem 0 0.5rem 0; font-size: 0.875rem; color: var(--gray-600);">Add Existing Author</h4>
+                    <div class="add-relationship-form">
+                        <div class="search-dropdown">
+                            <input type="text" id="author-search" placeholder="Search existing authors..." class="form-input">
+                            <div id="author-results" class="search-results" style="display: none;"></div>
+                            <input type="hidden" id="selected_author_id">
+                        </div>
+                        <div class="form-group">
+                            <select id="existing-author-role" class="form-select">
+                                <option value="author">Author</option>
+                                <option value="artist">Artist</option>
+                                <option value="story">Story</option>
+                                <option value="art">Art</option>
+                            </select>
+                        </div>
+                        <button type="button" onclick="addExistingAuthor()" class="btn btn-primary">Add Existing</button>
                     </div>
-                    <div class="form-group">
-                        <select name="role" class="form-select">
-                            <option value="author">Author</option>
-                            <option value="artist">Artist</option>
-                            <option value="story">Story</option>
-                            <option value="art">Art</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Add Author</button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- Languages Management -->
+    <!-- Languages Management (unchanged) -->
     <div class="relationship-section">
         <div class="card">
             <div class="card-header">
@@ -187,24 +271,665 @@
         </div>
     </div>
 {% endif %}
-{% endblock %}
 
-{% block extra_scripts %}
-{% if manga %}
+<style>
+/* Quick Add Styles */
+.quick-add-section {
+    background-color: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.quick-add-header h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.quick-add-header p {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+}
+
+.quick-add-form {
+    margin: 0;
+}
+
+.search-add-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.flash-message-inline {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    font-weight: 500;
+}
+
+.flash-success-inline {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.flash-error-inline {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.flash-warning-inline {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.flash-info-inline {
+    background-color: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+.new-tag-highlight, .new-author-highlight {
+    background-color: #d1fae5 !important;
+    transition: background-color 2s ease-out;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.removing {
+    opacity: 0.5;
+    transition: opacity 0.3s ease-out;
+}
+</style>
+
 <script>
-    // Setup tag search
-    setupSearchDropdown('tag-search', 'tag-results', '/api/search/tags', function(tag) {
-        document.getElementById('tag_id').value = tag.id;
-        document.getElementById('tag-search').value = tag.name;
-        document.getElementById('tag-results').style.display = 'none';
+// Global state
+const mangaId = {{ manga.manga_id if manga else 'null' }};
+let tagQuickAddVisible = false;
+let authorQuickAddVisible = false;
+
+// Utility functions
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showStatus(elementId, message, type, duration = 5000) {
+    const statusDiv = document.getElementById(elementId);
+    statusDiv.innerHTML = `<div class="flash-message-inline flash-${type}-inline">${message}</div>`;
+    
+    if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+            if (statusDiv.innerHTML.includes(message)) {
+                statusDiv.innerHTML = '';
+            }
+        }, duration);
+    }
+}
+
+// Tag Management Functions
+function toggleTagQuickAdd() {
+    const form = document.getElementById('tag-quick-add-form');
+    const toggleBtn = document.getElementById('tag-toggle-btn');
+    
+    tagQuickAddVisible = !tagQuickAddVisible;
+    
+    if (tagQuickAddVisible) {
+        form.style.display = 'block';
+        form.classList.add('fade-in-up');
+        toggleBtn.textContent = '❌ Close';
+        toggleBtn.className = 'btn btn-secondary btn-small';
+        document.getElementById('tag-bulk-input').focus();
+    } else {
+        form.style.display = 'none';
+        toggleBtn.textContent = '🏷️ Quick Add';
+        toggleBtn.className = 'btn btn-success btn-small';
+        clearTagQuickForm();
+    }
+}
+
+function clearTagQuickForm() {
+    document.getElementById('tag-bulk-input').value = '';
+    document.getElementById('tag-quick-add-status').innerHTML = '';
+}
+
+async function quickAddTags(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('tag-quick-submit-btn');
+    const nameInput = document.getElementById('tag-bulk-input');
+    const tagNames = nameInput.value.trim();
+    
+    if (!tagNames) {
+        showStatus('tag-quick-add-status', 'Please enter at least one tag name', 'error');
+        return;
+    }
+    
+    // Parse tag names (split by comma, clean up)
+    const tagList = tagNames.split(',').map(name => name.trim()).filter(name => name.length > 0);
+    
+    if (tagList.length === 0) {
+        showStatus('tag-quick-add-status', 'Please enter valid tag names', 'error');
+        return;
+    }
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Adding Tags...';
+    
+    let successCount = 0;
+    let existingCount = 0;
+    let errorCount = 0;
+    const results = [];
+    
+    // Process each tag
+    for (const tagName of tagList) {
+        try {
+            // First, try to create the tag
+            const createResult = await createTag(tagName);
+            if (createResult.success) {
+                // Tag created, now associate it with manga
+                const associateResult = await associateTagWithManga(createResult.tagId, tagName);
+                if (associateResult.success) {
+                    successCount++;
+                    addTagToDisplay(tagName, createResult.tagId);
+                } else {
+                    results.push(`Failed to associate "${tagName}": ${associateResult.error}`);
+                    errorCount++;
+                }
+            } else if (createResult.error.includes('already exists')) {
+                // Tag exists, try to find it and associate
+                const searchResult = await searchTagByName(tagName);
+                if (searchResult.tagId) {
+                    const associateResult = await associateTagWithManga(searchResult.tagId, tagName);
+                    if (associateResult.success) {
+                        successCount++;
+                        addTagToDisplay(tagName, searchResult.tagId);
+                    } else if (associateResult.error.includes('already associated')) {
+                        existingCount++;
+                    } else {
+                        results.push(`Failed to associate existing tag "${tagName}": ${associateResult.error}`);
+                        errorCount++;
+                    }
+                } else {
+                    results.push(`Could not find existing tag "${tagName}"`);
+                    errorCount++;
+                }
+            } else {
+                results.push(`Failed to create "${tagName}": ${createResult.error}`);
+                errorCount++;
+            }
+        } catch (error) {
+            results.push(`Error processing "${tagName}": ${error.message}`);
+            errorCount++;
+        }
+    }
+    
+    // Show results
+    let message = '';
+    if (successCount > 0) message += `✅ Added ${successCount} tag(s). `;
+    if (existingCount > 0) message += `ℹ️ ${existingCount} tag(s) already associated. `;
+    if (errorCount > 0) message += `❌ ${errorCount} error(s). `;
+    
+    if (results.length > 0) {
+        message += '<br><small>' + results.join('; ') + '</small>';
+    }
+    
+    const statusType = errorCount > 0 ? 'warning' : 'success';
+    showStatus('tag-quick-add-status', message, statusType, 8000);
+    
+    // Clear form on success
+    if (successCount > 0 || existingCount > 0) {
+        nameInput.value = '';
+        nameInput.focus();
+    }
+    
+    submitBtn.disabled = false;
+    submitBtn.textContent = '➕ Add Tags';
+}
+
+async function createTag(tagName) {
+    try {
+        const formData = new FormData();
+        formData.append('tag_name', tagName);
+        
+        const response = await fetch('/api/tags', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        return {
+            success: data.success,
+            tagId: data.tag ? data.tag.id : null,
+            error: data.error
+        };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+async function searchTagByName(tagName) {
+    try {
+        const response = await fetch(`/api/search/tags?q=${encodeURIComponent(tagName)}`);
+        const tags = await response.json();
+        
+        // Look for exact match
+        const exactMatch = tags.find(tag => tag.name.toLowerCase() === tagName.toLowerCase());
+        return {
+            tagId: exactMatch ? exactMatch.id : null
+        };
+    } catch (error) {
+        return { tagId: null };
+    }
+}
+
+async function associateTagWithManga(tagId, tagName) {
+    try {
+        const formData = new FormData();
+        formData.append('tag_id', tagId);
+        
+        const response = await fetch(`/manga/${mangaId}/tags/add`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            return { success: true };
+        } else {
+            const text = await response.text();
+            if (text.includes('already associated') || text.includes('already exists')) {
+                return { success: false, error: 'Tag already associated with this manga' };
+            }
+            return { success: false, error: 'Failed to associate tag' };
+        }
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+function addTagToDisplay(tagName, tagId) {
+    const container = document.getElementById('current-tags');
+    
+    const tagElement = document.createElement('div');
+    tagElement.className = 'relationship-tag new-tag-highlight';
+    tagElement.setAttribute('data-tag-id', tagId);
+    tagElement.innerHTML = `
+        ${escapeHtml(tagName)}
+        <button type="button" class="relationship-remove" 
+                onclick="removeTag(${tagId}, '${escapeHtml(tagName)}')" 
+                title="Remove tag">×</button>
+    `;
+    
+    container.appendChild(tagElement);
+    
+    // Remove highlight after animation
+    setTimeout(() => {
+        tagElement.classList.remove('new-tag-highlight');
+    }, 2000);
+}
+
+async function removeTag(tagId, tagName) {
+    const tagElement = document.querySelector(`[data-tag-id="${tagId}"]`);
+    if (!tagElement) return;
+    
+    tagElement.classList.add('removing');
+    
+    try {
+        const response = await fetch(`/manga/${mangaId}/tags/${tagId}/remove`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            tagElement.remove();
+            showStatus('tag-quick-add-status', `✅ Removed tag "${tagName}"`, 'info', 3000);
+        } else {
+            tagElement.classList.remove('removing');
+            showStatus('tag-quick-add-status', `❌ Failed to remove tag "${tagName}"`, 'error');
+        }
+    } catch (error) {
+        tagElement.classList.remove('removing');
+        showStatus('tag-quick-add-status', `❌ Error removing tag "${tagName}": ${error.message}`, 'error');
+    }
+}
+
+function addExistingTag() {
+    const tagId = document.getElementById('selected_tag_id').value;
+    const searchInput = document.getElementById('tag-search');
+    const tagName = searchInput.value.trim();
+    
+    if (!tagId || !tagName) {
+        showStatus('tag-quick-add-status', 'Please select a tag from the search results', 'error');
+        return;
+    }
+    
+    associateTagWithManga(tagId, tagName).then(result => {
+        if (result.success) {
+            addTagToDisplay(tagName, tagId);
+            searchInput.value = '';
+            document.getElementById('selected_tag_id').value = '';
+            document.getElementById('tag-results').style.display = 'none';
+            showStatus('tag-quick-add-status', `✅ Added existing tag "${tagName}"`, 'success', 3000);
+        } else {
+            showStatus('tag-quick-add-status', `❌ ${result.error}`, 'error');
+        }
+    });
+}
+
+// Author Management Functions
+function toggleAuthorQuickAdd() {
+    const form = document.getElementById('author-quick-add-form');
+    const toggleBtn = document.getElementById('author-toggle-btn');
+    
+    authorQuickAddVisible = !authorQuickAddVisible;
+    
+    if (authorQuickAddVisible) {
+        form.style.display = 'block';
+        form.classList.add('fade-in-up');
+        toggleBtn.textContent = '❌ Close';
+        toggleBtn.className = 'btn btn-secondary btn-small';
+        document.getElementById('author-name-input').focus();
+    } else {
+        form.style.display = 'none';
+        toggleBtn.textContent = '✍️ Quick Add';
+        toggleBtn.className = 'btn btn-success btn-small';
+        clearAuthorQuickForm();
+    }
+}
+
+function clearAuthorQuickForm() {
+    document.getElementById('author-name-input').value = '';
+    document.getElementById('author-role-input').value = 'author';
+    document.getElementById('author-quick-add-status').innerHTML = '';
+}
+
+async function quickAddAuthor(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('author-quick-submit-btn');
+    const nameInput = document.getElementById('author-name-input');
+    const roleSelect = document.getElementById('author-role-input');
+    
+    const authorName = nameInput.value.trim();
+    const role = roleSelect.value;
+    
+    if (!authorName) {
+        showStatus('author-quick-add-status', 'Please enter an author name', 'error');
+        return;
+    }
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Adding Author...';
+    
+    try {
+        // Create author
+        const createResult = await createAuthor(authorName);
+        if (createResult.success) {
+            // Associate with manga
+            const associateResult = await associateAuthorWithManga(createResult.authorId, authorName, role);
+            if (associateResult.success) {
+                addAuthorToDisplay(authorName, role, createResult.authorId);
+                showStatus('author-quick-add-status', `✅ Added author "${authorName}" as ${role}`, 'success');
+                nameInput.value = '';
+                nameInput.focus();
+            } else {
+                showStatus('author-quick-add-status', `❌ Failed to associate author: ${associateResult.error}`, 'error');
+            }
+        } else {
+            // Author might exist, try to find and associate
+            if (createResult.error.includes('already exists')) {
+                const searchResult = await searchAuthorByName(authorName);
+                if (searchResult.authorId) {
+                    const associateResult = await associateAuthorWithManga(searchResult.authorId, authorName, role);
+                    if (associateResult.success) {
+                        addAuthorToDisplay(authorName, role, searchResult.authorId);
+                        showStatus('author-quick-add-status', `✅ Added existing author "${authorName}" as ${role}`, 'success');
+                        nameInput.value = '';
+                        nameInput.focus();
+                    } else {
+                        showStatus('author-quick-add-status', `❌ ${associateResult.error}`, 'error');
+                    }
+                } else {
+                    showStatus('author-quick-add-status', `❌ Could not find existing author "${authorName}"`, 'error');
+                }
+            } else {
+                showStatus('author-quick-add-status', `❌ ${createResult.error}`, 'error');
+            }
+        }
+    } catch (error) {
+        showStatus('author-quick-add-status', `❌ Error: ${error.message}`, 'error');
+    }
+    
+    submitBtn.disabled = false;
+    submitBtn.textContent = '➕ Add Author';
+}
+
+async function createAuthor(authorName) {
+    try {
+        const formData = new FormData();
+        formData.append('name_romanized', authorName);
+        
+        const response = await fetch('/api/authors', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        return {
+            success: data.success,
+            authorId: data.author ? data.author.id : null,
+            error: data.error
+        };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+async function searchAuthorByName(authorName) {
+    try {
+        const response = await fetch(`/api/search/authors?q=${encodeURIComponent(authorName)}`);
+        const authors = await response.json();
+        
+        const exactMatch = authors.find(author => author.name.toLowerCase() === authorName.toLowerCase());
+        return {
+            authorId: exactMatch ? exactMatch.id : null
+        };
+    } catch (error) {
+        return { authorId: null };
+    }
+}
+
+async function associateAuthorWithManga(authorId, authorName, role) {
+    try {
+        const formData = new FormData();
+        formData.append('author_id', authorId);
+        formData.append('role', role);
+        
+        const response = await fetch(`/manga/${mangaId}/authors/add`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            return { success: true };
+        } else {
+            const text = await response.text();
+            if (text.includes('already associated')) {
+                return { success: false, error: 'Author already associated with this manga in this role' };
+            }
+            return { success: false, error: 'Failed to associate author' };
+        }
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+function addAuthorToDisplay(authorName, role, authorId) {
+    const container = document.getElementById('current-authors');
+    
+    const authorElement = document.createElement('div');
+    authorElement.className = 'relationship-tag new-author-highlight';
+    authorElement.setAttribute('data-author-id', authorId);
+    authorElement.innerHTML = `
+        ${escapeHtml(authorName)} (${escapeHtml(role)})
+        <button type="button" class="relationship-remove" 
+                onclick="removeAuthor(${authorId}, '${escapeHtml(authorName)}')" 
+                title="Remove author">×</button>
+    `;
+    
+    container.appendChild(authorElement);
+    
+    setTimeout(() => {
+        authorElement.classList.remove('new-author-highlight');
+    }, 2000);
+}
+
+async function removeAuthor(authorId, authorName) {
+    const authorElement = document.querySelector(`[data-author-id="${authorId}"]`);
+    if (!authorElement) return;
+    
+    authorElement.classList.add('removing');
+    
+    try {
+        const response = await fetch(`/manga/${mangaId}/authors/${authorId}/remove`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            authorElement.remove();
+            showStatus('author-quick-add-status', `✅ Removed author "${authorName}"`, 'info', 3000);
+        } else {
+            authorElement.classList.remove('removing');
+            showStatus('author-quick-add-status', `❌ Failed to remove author "${authorName}"`, 'error');
+        }
+    } catch (error) {
+        authorElement.classList.remove('removing');
+        showStatus('author-quick-add-status', `❌ Error removing author "${authorName}": ${error.message}`, 'error');
+    }
+}
+
+function addExistingAuthor() {
+    const authorId = document.getElementById('selected_author_id').value;
+    const searchInput = document.getElementById('author-search');
+    const authorName = searchInput.value.trim();
+    const role = document.getElementById('existing-author-role').value;
+    
+    if (!authorId || !authorName) {
+        showStatus('author-quick-add-status', 'Please select an author from the search results', 'error');
+        return;
+    }
+    
+    associateAuthorWithManga(authorId, authorName, role).then(result => {
+        if (result.success) {
+            addAuthorToDisplay(authorName, role, authorId);
+            searchInput.value = '';
+            document.getElementById('selected_author_id').value = '';
+            document.getElementById('author-results').style.display = 'none';
+            showStatus('author-quick-add-status', `✅ Added existing author "${authorName}" as ${role}`, 'success', 3000);
+        } else {
+            showStatus('author-quick-add-status', `❌ ${result.error}`, 'error');
+        }
+    });
+}
+
+// Setup search dropdowns (from original code)
+document.addEventListener('DOMContentLoaded', function() {
+    if (mangaId) {
+        // Setup tag search
+        setupSearchDropdown('tag-search', 'tag-results', '/api/search/tags', function(tag) {
+            document.getElementById('selected_tag_id').value = tag.id;
+            document.getElementById('tag-search').value = tag.name;
+            document.getElementById('tag-results').style.display = 'none';
+        });
+        
+        // Setup author search
+        setupSearchDropdown('author-search', 'author-results', '/api/search/authors', function(author) {
+            document.getElementById('selected_author_id').value = author.id;
+            document.getElementById('author-search').value = author.name;
+            document.getElementById('author-results').style.display = 'none';
+        });
+    }
+});
+
+// Search dropdown functionality (from base template)
+function setupSearchDropdown(inputId, resultsId, searchUrl, selectCallback) {
+    const input = document.getElementById(inputId);
+    const results = document.getElementById(resultsId);
+    
+    if (!input || !results) return;
+    
+    let timeout;
+    
+    input.addEventListener('input', function() {
+        clearTimeout(timeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            results.innerHTML = '';
+            results.style.display = 'none';
+            return;
+        }
+        
+        timeout = setTimeout(() => {
+            fetch(`${searchUrl}?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    results.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        results.innerHTML = '<div class="search-result-item">No results found</div>';
+                    } else {
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'search-result-item';
+                            div.textContent = item.name || item.title;
+                            div.addEventListener('click', () => selectCallback(item));
+                            results.appendChild(div);
+                        });
+                    }
+                    
+                    results.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    results.innerHTML = '<div class="search-result-item">Error loading results</div>';
+                    results.style.display = 'block';
+                });
+        }, 300);
     });
     
-    // Setup author search
-    setupSearchDropdown('author-search', 'author-results', '/api/search/authors', function(author) {
-        document.getElementById('author_id').value = author.id;
-        document.getElementById('author-search').value = author.name;
-        document.getElementById('author-results').style.display = 'none';
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+            results.style.display = 'none';
+        }
     });
+}
 </script>
-{% endif %}
 {% endblock %}
