@@ -70,9 +70,6 @@ def get_manga_list(
                     m.manga_status as status,
                     m.started_publishing as publish_date,
                     m.cover_path,
-                    COALESCE(
-                        ROUND((RANDOM() * 2 + 8)::NUMERIC, 1), 8.5
-                    ) as rating,
                     ARRAY_AGG(DISTINCT t.tag_name) FILTER (WHERE t.tag_name IS NOT NULL) as tags,
                     ARRAY_AGG(DISTINCT l.language_name_en) FILTER (WHERE l.language_name_en IS NOT NULL) as languages
                 FROM manga m
@@ -135,9 +132,6 @@ def get_manga_list(
                 query += " ORDER BY m.started_publishing DESC NULLS LAST"
             elif sort_by == "date-oldest":
                 query += " ORDER BY m.started_publishing ASC NULLS LAST"
-            elif sort_by == "rating":
-                query += " ORDER BY rating DESC"
-
             # Add limit
             if limit:
                 query += f" LIMIT {limit}"
@@ -150,7 +144,6 @@ def get_manga_list(
                 manga = {
                     "id": row["manga_id"],
                     "title": row["title"] or "Unknown Title",
-                    "rating": float(row["rating"]) if row["rating"] else 8.5,
                     "status": row["status"] or "unknown",
                     "language": row["languages"][0].lower()
                     if row["languages"] and row["languages"][0]
@@ -183,9 +176,6 @@ def get_section_manga(manga_list, section_type, limit=6):
             reverse=True,
         )
         return sorted_by_date[:limit]
-    elif section_type == "curated":
-        high_rated = [manga for manga in manga_list if manga["rating"] >= 9.0]
-        return high_rated[:limit]
     return []
 
 
@@ -197,7 +187,6 @@ def index():
     sections = {
         "trending": get_section_manga(manga_list, "trending"),
         "just_published": get_section_manga(manga_list, "just-published"),
-        "curated": get_section_manga(manga_list, "curated"),
     }
 
     return render_template("gallery.html", sections=sections)
@@ -224,7 +213,6 @@ def search():
         sections = {
             "trending": get_section_manga(filtered_manga, "trending"),
             "just_published": get_section_manga(filtered_manga, "just-published"),
-            "curated": get_section_manga(filtered_manga, "curated"),
         }
     else:
         # Show search results

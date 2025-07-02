@@ -420,13 +420,6 @@ body {
   color: var(--text-primary);
 }
 
-.manga-rating {
-  font-size: 0.875rem;
-  color: var(--accent-primary);
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-}
-
 /* Cycling Tags Animation */
 .cycling-tags {
   position: absolute;

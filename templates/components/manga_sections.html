@@ -39,15 +39,4 @@
             </div>
         </section>
     {% endif %}
-
-    {% if sections.curated %}
-        <section>
-            <h2 class="section-title">⭐ Editor's Choice</h2>
-            <div class="manga-grid">
-                {% for manga in sections.curated %}
-                    {% include 'components/manga_card.html' %}
-                {% endfor %}
-            </div>
-        </section>
-    {% endif %}
 {% endif %}
