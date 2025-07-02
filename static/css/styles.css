@@ -392,23 +392,6 @@ body {
   outline-offset: 2px;
 }
 
-.manga-cover {
-  width: 100%;
-  aspect-ratio: 3/4;
-  background-color: var(--bg-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-light);
-  position: relative;
-}
-
-.cover-placeholder {
-  z-index: 1;
-}
-
 .manga-info {
   padding: 1rem;
 }
@@ -586,7 +569,7 @@ body {
 /* Update manga cover styles */
 .manga-cover {
   width: 100%;
-  aspect-ratio: 3/4;
+  aspect-ratio: 19/30;
   background-color: var(--bg-secondary);
   display: flex;
   align-items: center;
