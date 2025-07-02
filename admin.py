@@ -1279,6 +1279,127 @@ def tag_new():
         conn.close()
 
 
+@app.route("/api/tags", methods=["POST"])
+def api_tag_create():
+    """API endpoint for creating tags via AJAX"""
+    try:
+        tag_name = request.form.get("tag_name", "").strip()
+
+        if not tag_name:
+            return jsonify({"success": False, "error": "Tag name is required"}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify(
+                {"success": False, "error": "Database connection error"}
+            ), 500
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO tag (tag_name) VALUES (%s) RETURNING tag_id",
+                    (tag_name,),
+                )
+                tag_id = cur.fetchone()[0]
+                conn.commit()
+
+                return jsonify(
+                    {
+                        "success": True,
+                        "message": f"Tag '{tag_name}' created successfully",
+                        "tag": {"id": tag_id, "name": tag_name, "manga_count": 0},
+                    }
+                )
+
+        except psycopg2.IntegrityError:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Tag name already exists"}), 400
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Tag creation error: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            conn.close()
+
+    except Exception as e:
+        logger.error(f"API tag creation error: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+@app.route("/api/tags/bulk", methods=["POST"])
+def api_tags_bulk_create():
+    """API endpoint for bulk creating tags"""
+    try:
+        tag_names = request.json.get("tag_names", [])
+
+        if not tag_names or not isinstance(tag_names, list):
+            return jsonify(
+                {"success": False, "error": "Tag names array is required"}
+            ), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify(
+                {"success": False, "error": "Database connection error"}
+            ), 500
+
+        created_tags = []
+        existing_tags = []
+        errors = []
+
+        try:
+            with conn.cursor() as cur:
+                for tag_name in tag_names:
+                    tag_name = tag_name.strip()
+                    if not tag_name:
+                        continue
+
+                    try:
+                        cur.execute(
+                            "INSERT INTO tag (tag_name) VALUES (%s) RETURNING tag_id",
+                            (tag_name,),
+                        )
+                        tag_id = cur.fetchone()[0]
+                        created_tags.append(
+                            {"id": tag_id, "name": tag_name, "manga_count": 0}
+                        )
+                    except psycopg2.IntegrityError:
+                        # Tag already exists
+                        existing_tags.append(tag_name)
+                        conn.rollback()
+                        conn = get_db_connection()  # Get new connection after rollback
+                        cur = conn.cursor()
+                        continue
+                    except Exception as e:
+                        errors.append(f"Error creating '{tag_name}': {str(e)}")
+                        continue
+
+                conn.commit()
+
+                return jsonify(
+                    {
+                        "success": True,
+                        "created": len(created_tags),
+                        "existing": len(existing_tags),
+                        "errors": len(errors),
+                        "created_tags": created_tags,
+                        "existing_tags": existing_tags,
+                        "error_details": errors,
+                    }
+                )
+
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Bulk tag creation error: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            conn.close()
+
+    except Exception as e:
+        logger.error(f"API bulk tag creation error: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
 # ====================== AUTHOR CRUD ======================
 
 
@@ -1347,6 +1468,59 @@ def author_new():
         return render_template("admin/authors/form.html", author=None)
     finally:
         conn.close()
+
+
+@app.route("/api/authors", methods=["POST"])
+def api_author_create():
+    """API endpoint for creating authors via AJAX"""
+    try:
+        name_romanized = request.form.get("name_romanized", "").strip()
+
+        if not name_romanized:
+            return jsonify({"success": False, "error": "Author name is required"}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify(
+                {"success": False, "error": "Database connection error"}
+            ), 500
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO author (name_romanized) VALUES (%s) RETURNING author_id",
+                    (name_romanized,),
+                )
+                author_id = cur.fetchone()[0]
+                conn.commit()
+
+                return jsonify(
+                    {
+                        "success": True,
+                        "message": f"Author '{name_romanized}' created successfully",
+                        "author": {
+                            "id": author_id,
+                            "name": name_romanized,
+                            "manga_count": 0,
+                        },
+                    }
+                )
+
+        except psycopg2.IntegrityError:
+            conn.rollback()
+            return jsonify(
+                {"success": False, "error": "Author name already exists"}
+            ), 400
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Author creation error: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            conn.close()
+
+    except Exception as e:
+        logger.error(f"API author creation error: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 # ====================== SEARCH ENDPOINTS ======================

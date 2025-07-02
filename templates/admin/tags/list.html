@@ -9,7 +9,34 @@
             <h1 class="page-title">Tags</h1>
             <p class="page-subtitle">Manage tags for categorizing manga</p>
         </div>
-        <a href="{{ url_for('tag_new') }}" class="btn btn-primary">Add New Tag</a>
+        <button onclick="toggleQuickAdd()" class="btn btn-primary" id="toggle-btn">
+            🏷️ Quick Add
+        </button>
+    </div>
+</div>
+
+<!-- Quick Add Form -->
+<div id="quick-add-form" class="card" style="display: none; margin-bottom: 1rem;">
+    <div class="card-header">
+        <h2 class="card-title">Quick Add Tag</h2>
+    </div>
+    <div class="card-body">
+        <form onsubmit="quickAddTag(event)" class="quick-add-form">
+            <div class="flex gap-2 items-end">
+                <div class="form-group" style="flex: 1;">
+                    <label for="quick-tag-name" class="form-label">Tag Name</label>
+                    <input type="text" id="quick-tag-name" name="tag_name" class="form-input" 
+                           placeholder="e.g., Action, Romance, School Life" required>
+                </div>
+                <button type="submit" class="btn btn-success" id="quick-submit-btn">
+                    ➕ Add
+                </button>
+                <button type="button" onclick="clearQuickForm()" class="btn btn-secondary">
+                    🔄 Clear
+                </button>
+            </div>
+            <div id="quick-add-status" class="mt-2"></div>
+        </form>
     </div>
 </div>
 
@@ -21,35 +48,283 @@
     </div>
     <div class="card-body">
         {% if tags %}
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Tag Name</th>
-                        <th>Used in Manga</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for tag in tags %}
-                    <tr>
-                        <td><strong>{{ tag.tag_name }}</strong></td>
-                        <td>{{ tag.manga_count }} manga</td>
-                        <td>
-                            <a href="{{ url_for('tag_edit', tag_id=tag.tag_id) }}" class="btn btn-small btn-primary">Edit</a>
-                            {% if tag.manga_count == 0 %}
-                                <form method="POST" action="{{ url_for('tag_delete', tag_id=tag.tag_id) }}" style="display: inline;" 
-                                      onsubmit="return confirm('Are you sure you want to delete this tag?')">
-                                    <button type="submit" class="btn btn-small btn-danger">Delete</button>
-                                </form>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div id="tags-table-container">
+                <table class="table" id="tags-table">
+                    <thead>
+                        <tr>
+                            <th>Tag Name</th>
+                            <th>Used in Manga</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tags-tbody">
+                        {% for tag in tags %}
+                        <tr data-tag-id="{{ tag.tag_id }}">
+                            <td><strong>{{ tag.tag_name }}</strong></td>
+                            <td>{{ tag.manga_count }} manga</td>
+                            <td>
+                                <a href="{{ url_for('tag_edit', tag_id=tag.tag_id) }}" class="btn btn-small btn-primary">Edit</a>
+                                {% if tag.manga_count == 0 %}
+                                    <form method="POST" action="{{ url_for('tag_delete', tag_id=tag.tag_id) }}" style="display: inline;" 
+                                          onsubmit="return confirm('Are you sure you want to delete this tag?')">
+                                        <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% else %}
-            <p class="text-center">No tags found. <a href="{{ url_for('tag_new') }}">Create your first tag</a>!</p>
+            <div id="no-tags-message">
+                <p class="text-center">No tags found. Use the Quick Add form above to create your first tag!</p>
+            </div>
         {% endif %}
     </div>
 </div>
+
+<style>
+.quick-add-form {
+    margin: 0;
+}
+
+.flash-message-inline {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    font-weight: 500;
+}
+
+.flash-success-inline {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.flash-error-inline {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.flash-info-inline {
+    background-color: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+.new-row-highlight {
+    background-color: #d1fae5 !important;
+    transition: background-color 2s ease-out;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+</style>
+
+<script>
+let quickAddVisible = false;
+
+
+function toggleQuickAdd() {
+    const form = document.getElementById('quick-add-form');
+    const toggleBtn = document.getElementById('toggle-btn');
+    
+    quickAddVisible = !quickAddVisible;
+    
+    if (quickAddVisible) {
+        form.style.display = 'block';
+        form.classList.add('fade-in-up');
+        toggleBtn.textContent = '❌ Close';
+        toggleBtn.className = 'btn btn-secondary';
+        
+        // Focus on the input field
+        document.getElementById('quick-tag-name').focus();
+    } else {
+        form.style.display = 'none';
+        toggleBtn.textContent = '🏷️ Quick Add';
+        toggleBtn.className = 'btn btn-primary';
+        clearQuickForm();
+    }
+}
+
+function clearQuickForm() {
+    document.getElementById('quick-tag-name').value = '';
+    document.getElementById('quick-add-status').innerHTML = '';
+    document.getElementById('quick-tag-name').focus();
+}
+
+async function quickAddTag(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitBtn = document.getElementById('quick-submit-btn');
+    const statusDiv = document.getElementById('quick-add-status');
+    const nameInput = document.getElementById('quick-tag-name');
+    
+    const tagName = nameInput.value.trim();
+    
+    if (!tagName) {
+        showStatus('Please enter a tag name', 'error');
+        return;
+    }
+    
+    await addSingleTag(tagName, nameInput, submitBtn);
+}
+
+async function addSingleTag(tagName, nameInput, submitBtn) {
+    const statusDiv = document.getElementById('quick-add-status');
+    
+    // Disable form during submission
+    submitBtn.disabled = true;
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = '⏳ Adding...';
+    
+    try {
+        const formData = new FormData();
+        formData.append('tag_name', tagName);
+        
+        const response = await fetch('/api/tags', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showStatus(`✅ ${data.message}`, 'success');
+            
+            // Add the new tag to the table
+            addTagToTable(data.tag.name, data.tag.id);
+            
+            // Clear the form
+            if (nameInput) {
+                nameInput.value = '';
+                nameInput.focus();
+            }
+            
+            // Hide no-tags message if it exists
+            const noTagsMsg = document.getElementById('no-tags-message');
+            if (noTagsMsg) {
+                noTagsMsg.style.display = 'none';
+            }
+            
+            return true;
+            
+        } else {
+            showStatus(`❌ ${data.error}`, 'error');
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('Error adding tag:', error);
+        showStatus(`❌ Network error adding "${tagName}". Please try again.`, 'error');
+        return false;
+    } finally {
+        // Re-enable form
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+}
+
+
+function showStatus(message, type) {
+    const statusDiv = document.getElementById('quick-add-status');
+    statusDiv.innerHTML = `<div class="flash-message-inline flash-${type}-inline">${message}</div>`;
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+            if (statusDiv.innerHTML.includes(message)) {
+                statusDiv.innerHTML = '';
+            }
+        }, 5000);
+    }
+}
+
+function addTagToTable(tagName, tagId = null) {
+    const tbody = document.getElementById('tags-tbody');
+    const table = document.getElementById('tags-table');
+    
+    // Create new row
+    const row = document.createElement('tr');
+    row.className = 'new-row-highlight';
+    if (tagId) {
+        row.setAttribute('data-tag-id', tagId);
+    }
+    
+    const editLink = tagId ? 
+        `<a href="/tags/${tagId}/edit" class="btn btn-small btn-primary">Edit</a>` :
+        `<span class="btn btn-small btn-primary" style="opacity: 0.6;">Edit (refresh to edit)</span>`;
+        
+    const deleteForm = tagId ? 
+        `<form method="POST" action="/tags/${tagId}/delete" style="display: inline;" 
+              onsubmit="return confirm('Are you sure you want to delete this tag?')">
+            <button type="submit" class="btn btn-small btn-danger">Delete</button>
+        </form>` :
+        `<span class="btn btn-small btn-danger" style="opacity: 0.6;">Delete (refresh to delete)</span>`;
+    
+    row.innerHTML = `
+        <td><strong>${escapeHtml(tagName)}</strong></td>
+        <td>0 manga</td>
+        <td>
+            ${editLink}
+            ${deleteForm}
+        </td>
+    `;
+    
+    // Insert at the beginning of the tbody
+    tbody.insertBefore(row, tbody.firstChild);
+    
+    // Remove highlight after animation
+    setTimeout(() => {
+        row.classList.remove('new-row-highlight');
+    }, 2000);
+    
+    // Show the table if it was hidden
+    const tableContainer = document.getElementById('tags-table-container');
+    if (tableContainer) {
+        tableContainer.style.display = 'block';
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Handle Enter key in the form
+document.addEventListener('DOMContentLoaded', function() {
+    const nameInput = document.getElementById('quick-tag-name');
+    if (nameInput) {
+        nameInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                document.getElementById('quick-submit-btn').click();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
