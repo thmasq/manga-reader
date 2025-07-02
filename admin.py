@@ -179,10 +179,11 @@ def manga_new():
                     request.form.get("cover_path") or None,
                 ),
             )
-
+            manga_id = cur.fetchone()[0]
             conn.commit()
 
             flash("Manga created successfully!", "success")
+            return redirect(url_for("manga_edit", manga_id=manga_id))
 
     except Exception as e:
         conn.rollback()
@@ -1079,14 +1080,6 @@ def health():
             return {"status": "unhealthy", "database": "disconnected"}, 503
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}, 503
-
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Manga creation error: {e}")
-        flash(f"Error creating manga: {str(e)}", "error")
-        return render_template("admin/manga/form.html", manga=None)
-    finally:
-        conn.close()
 
 
 @app.route("/manga/<int:manga_id>/edit", methods=["GET", "POST"])
