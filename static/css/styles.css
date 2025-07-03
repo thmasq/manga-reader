@@ -235,7 +235,7 @@ body {
   border-radius: 2rem;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.1s ease-in-out;
   font-size: 0.875rem;
   font-weight: 500;
 }

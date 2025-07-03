@@ -1,0 +1,743 @@
+{% extends "base.html" %}
+
+{% block title %}{{ manga.title }} - MangaReader{% endblock %}
+
+{% block content %}
+
+{% set chapters_json = manga.chapters | tojson | safe %}
+
+    <div class="container" x-data='mangaDetailManager({{ manga.id }}, {{ chapters_json }})'>
+    <!-- Back Navigation -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/" class="back-link">← Back to Gallery</a>
+    </nav>
+
+    <!-- Manga Detail Header -->
+    <div class="manga-detail-header">
+        <div class="manga-detail-cover">
+            {% if manga.cover_path %}
+                <img 
+                    src="{{ url_for('serve_image', image_path=manga.cover_path) }}"
+                    alt="Cover for {{ manga.title }}"
+                    class="detail-cover-image"
+                >
+            {% else %}
+                <div class="detail-cover-placeholder">
+                    <span>No Cover</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="manga-detail-info">
+            <!-- Titles -->
+            <h1 class="manga-main-title">{{ manga.title }}</h1>
+            
+            <div class="title-variations">
+                {% if manga.original_title and manga.original_title != manga.title %}
+                    <div class="title-variant">
+                        <span class="title-label">Original:</span>
+                        <span class="title-value">{{ manga.original_title }}</span>
+                    </div>
+                {% endif %}
+                
+                {% if manga.romanized_title and manga.romanized_title != manga.title %}
+                    <div class="title-variant">
+                        <span class="title-label">Romanized:</span>
+                        <span class="title-value">{{ manga.romanized_title }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Metadata -->
+            <div class="manga-metadata">
+                <!-- Status -->
+                <div class="metadata-item">
+                    <span class="metadata-label">Status:</span>
+                    <span class="status-badge status-{{ manga.status }}">
+                        {{ manga.status|capitalize }}
+                    </span>
+                </div>
+
+                <!-- Publishing Dates -->
+                {% if manga.started_publishing %}
+                    <div class="metadata-item">
+                        <span class="metadata-label">Published:</span>
+                        <span class="metadata-value">
+                            {{ manga.started_publishing }}
+                            {% if manga.ended_publishing %}
+                                - {{ manga.ended_publishing }}
+                            {% elif manga.status == 'ongoing' %}
+                                - Present
+                            {% endif %}
+                        </span>
+                    </div>
+                {% endif %}
+
+                <!-- Authors -->
+                {% if manga.authors %}
+                    <div class="metadata-item">
+                        <span class="metadata-label">Authors:</span>
+                        <span class="metadata-value">{{ manga.authors|join(', ') }}</span>
+                    </div>
+                {% endif %}
+
+                <!-- Languages -->
+                {% if manga.languages %}
+                    <div class="metadata-item">
+                        <span class="metadata-label">Available in:</span>
+                        <span class="metadata-value">{{ manga.languages|join(', ') }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Tags -->
+            {% if manga.tags %}
+                <div class="manga-tags">
+                    {% for tag in manga.tags %}
+                        <span class="detail-tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Reading Actions -->
+            <div class="reading-actions">
+                <button 
+                    class="action-btn primary"
+                    @click="startReading()"
+                    :disabled="chapters.length === 0"
+                >
+                    <span x-show="!hasProgress">Start Reading</span>
+                    <span x-show="hasProgress && !isCompleted">Continue Chapter <span x-text="continueChapter"></span></span>
+                    <span x-show="isCompleted">Re-read from Start</span>
+                </button>
+
+                <button 
+                    class="action-btn secondary"
+                    @click="jumpToFirst()"
+                    :disabled="chapters.length === 0"
+                    x-show="hasProgress && !isCompleted"
+                >
+                    Read from Beginning
+                </button>
+
+                <button 
+                    class="action-btn danger"
+                    @click="resetProgress()"
+                    x-show="hasProgress"
+                >
+                    Reset Progress
+                </button>
+            </div>
+
+            <!-- Reading Progress -->
+            <div class="reading-progress" x-show="hasProgress">
+                <div class="progress-info">
+                    <span class="progress-label">Progress:</span>
+                    <span class="progress-value">
+                        Chapter <span x-text="lastReadChapter"></span>
+                        <span x-show="lastReadPage > 0">(Page <span x-text="lastReadPage"></span>)</span>
+                    </span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" :style="`width: ${progressPercentage}%`"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chapters Section -->
+    <div class="chapters-section">
+        <div class="chapters-header">
+            <h2 class="chapters-title">Chapters</h2>
+            
+            <!-- Language Filter -->
+            <div class="language-selector" x-show="availableLanguages.length > 1">
+                <label for="language-select" class="sr-only">Select Language</label>
+                <select 
+                    id="language-select"
+                    class="language-dropdown"
+                    x-model="selectedLanguage"
+                    @change="filterChapters()"
+                >
+                    <option value="">All Languages</option>
+                    <template x-for="lang in availableLanguages" :key="lang">
+                        <option :value="lang" x-text="lang"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+
+        <!-- Chapters List -->
+        <div class="chapters-list" x-show="filteredChapters.length > 0">
+            <template x-for="chapter in filteredChapters" :key="chapter.chapter_id">
+                <div 
+                    class="chapter-item"
+                    :class="{ 'read': isChapterRead(chapter.chapter_num) }"
+                    @click="openChapter(chapter.chapter_id, chapter.chapter_num)"
+                    tabindex="0"
+                    @keydown.enter="openChapter(chapter.chapter_id, chapter.chapter_num)"
+                    role="button"
+                >
+                    <div class="chapter-number">
+                        Chapter <span x-text="chapter.chapter_num"></span>
+                    </div>
+                    
+                    <div class="chapter-meta">
+                        <span class="chapter-pages" x-show="chapter.page_count">
+                            <span x-text="chapter.page_count"></span> pages
+                        </span>
+                        
+                        <span class="chapter-languages" x-show="chapter.available_languages && chapter.available_languages.length">
+                            <span x-text="chapter.available_languages.join(', ')"></span>
+                        </span>
+                        
+                        <span class="chapter-status" x-show="isChapterRead(chapter.chapter_num)">
+                            ✓ Read
+                        </span>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <div class="no-chapters" x-show="filteredChapters.length === 0">
+            <p class="text-muted">No chapters available in the selected language.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Manga Detail Specific Styles */
+    .breadcrumb {
+        margin-bottom: 2rem;
+    }
+
+    .back-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        transition: color 0.2s;
+        position: relative;
+        top: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .back-link:hover {
+        color: var(--accent-primary);
+    }
+
+    .manga-detail-header {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 3rem;
+        margin-bottom: 3rem;
+    }
+
+    @media (max-width: 768px) {
+        .manga-detail-header {
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+    }
+
+    .manga-detail-cover {
+        position: relative;
+    }
+
+    .detail-cover-image {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .detail-cover-placeholder {
+        width: 100%;
+        aspect-ratio: 3/4;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        font-size: 1.2rem;
+    }
+
+    .manga-main-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+    }
+
+    .title-variations {
+        margin-bottom: 1.5rem;
+    }
+
+    .title-variant {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+    }
+
+    .title-label {
+        font-weight: 500;
+        opacity: 0.7;
+    }
+
+    .manga-metadata {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .metadata-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .metadata-label {
+        font-weight: 500;
+        color: var(--text-secondary);
+        min-width: 100px;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-transform: capitalize;
+    }
+
+    .status-ongoing {
+        background: rgba(34, 197, 94, 0.1);
+        color: rgb(34, 197, 94);
+    }
+
+    .status-completed {
+        background: rgba(59, 130, 246, 0.1);
+        color: rgb(59, 130, 246);
+    }
+
+    .status-hiatus {
+        background: rgba(251, 146, 60, 0.1);
+        color: rgb(251, 146, 60);
+    }
+
+    .status-cancelled {
+        background: rgba(239, 68, 68, 0.1);
+        color: rgb(239, 68, 68);
+    }
+
+    .status-unknown {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+    }
+
+    .manga-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .detail-tag {
+        padding: 0.375rem 0.875rem;
+        background: var(--bg-tertiary);
+        border-radius: 20px;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+    }
+
+    /* Reading Actions */
+    .reading-actions {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .action-btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 1rem;
+    }
+
+    .action-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .action-btn.primary {
+        background: var(--accent-primary);
+        color: white;
+    }
+
+    .action-btn.primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+    }
+
+    .action-btn.secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .action-btn.secondary:hover:not(:disabled) {
+        background: var(--bg-quaternary);
+    }
+
+    .action-btn.danger {
+        background: rgba(239, 68, 68, 0.1);
+        color: rgb(239, 68, 68);
+    }
+
+    .action-btn.danger:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.2);
+    }
+
+    /* Reading Progress */
+    .reading-progress {
+        background: var(--bg-secondary);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .progress-label {
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .progress-bar {
+        height: 6px;
+        background: var(--bg-tertiary);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: var(--accent-primary);
+        transition: width 0.3s ease;
+    }
+
+    /* Chapters Section */
+    .chapters-section {
+        margin-top: 3rem;
+    }
+
+    .chapters-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .chapters-title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .language-dropdown {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .chapters-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .chapter-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+    }
+
+    .chapter-item:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+    }
+
+    .chapter-item.read {
+        opacity: 0.7;
+    }
+
+    .chapter-item.read .chapter-number {
+        color: var(--text-secondary);
+    }
+
+    .chapter-number {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .chapter-meta {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+    }
+
+    .chapter-status {
+        color: rgb(34, 197, 94);
+        font-weight: 500;
+    }
+
+    .no-chapters {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
+    }
+
+    /* CSS Variables */
+    :root {
+        --bg-tertiary: #f3f4f6;
+        --bg-quaternary: #e5e7eb;
+        --border-color: #e5e7eb;
+        --accent-hover: #5a3faa;
+    }
+
+    [data-theme="dark"] {
+        --bg-tertiary: #374151;
+        --bg-quaternary: #4b5563;
+        --border-color: #374151;
+        --accent-hover: #7c5ce0;
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0,0,0,0);
+        white-space: nowrap;
+        border-width: 0;
+    }
+</style>
+
+<script>
+    function mangaDetailManager(mangaId, chapters) {
+        return {
+            mangaId: mangaId,
+            chapters: chapters || [],
+            filteredChapters: [],
+            selectedLanguage: '',
+            availableLanguages: [],
+            
+            // Reading progress state
+            hasProgress: false,
+            lastReadChapter: 0,
+            lastReadPage: 0,
+            continueChapter: 0,
+            isCompleted: false,
+            progressPercentage: 0,
+            
+            init() {
+                // Extract available languages
+                this.extractLanguages();
+                
+                // Load reading progress from cookie
+                this.loadProgress();
+                
+                // Initial filter
+                this.filterChapters();
+            },
+            
+            extractLanguages() {
+                const langSet = new Set();
+                this.chapters.forEach(chapter => {
+                    if (chapter.available_languages) {
+                        chapter.available_languages.forEach(lang => langSet.add(lang));
+                    }
+                });
+                this.availableLanguages = Array.from(langSet).sort();
+            },
+            
+            filterChapters() {
+                if (!this.selectedLanguage) {
+                    this.filteredChapters = this.chapters;
+                } else {
+                    this.filteredChapters = this.chapters.filter(chapter => 
+                        chapter.available_languages && 
+                        chapter.available_languages.includes(this.selectedLanguage)
+                    );
+                }
+                
+                // Sort by chapter number
+                this.filteredChapters.sort((a, b) => a.chapter_num - b.chapter_num);
+            },
+            
+            loadProgress() {
+                const cookieName = `manga_${this.mangaId}_progress`;
+                const cookie = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith(cookieName + '='));
+                
+                if (cookie) {
+                    const data = JSON.parse(decodeURIComponent(cookie.split('=')[1]));
+                    this.lastReadChapter = data.chapter || 0;
+                    this.lastReadPage = data.page || 0;
+                    this.hasProgress = this.lastReadChapter > 0;
+                    
+                    // Calculate continue chapter
+                    if (this.hasProgress) {
+                        const currentChapter = this.chapters.find(ch => ch.chapter_num == this.lastReadChapter);
+                        if (currentChapter) {
+                            // If we finished the chapter, go to next
+                            if (this.lastReadPage >= (currentChapter.page_count || 1)) {
+                                const nextChapter = this.findNextChapter(this.lastReadChapter);
+                                this.continueChapter = nextChapter ? nextChapter.chapter_num : this.lastReadChapter;
+                            } else {
+                                this.continueChapter = this.lastReadChapter;
+                            }
+                        }
+                        
+                        // Check if completed
+                        const lastChapter = this.chapters[this.chapters.length - 1];
+                        this.isCompleted = lastChapter && this.lastReadChapter >= lastChapter.chapter_num;
+                        
+                        // Calculate progress percentage
+                        if (this.chapters.length > 0) {
+                            const readCount = this.chapters.filter(ch => ch.chapter_num <= this.lastReadChapter).length;
+                            this.progressPercentage = (readCount / this.chapters.length) * 100;
+                        }
+                    }
+                }
+            },
+            
+            saveProgress(chapter, page) {
+                const cookieName = `manga_${this.mangaId}_progress`;
+                const data = {
+                    chapter: chapter,
+                    page: page,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Set cookie with 1 year expiry
+                const expires = new Date();
+                expires.setFullYear(expires.getFullYear() + 1);
+                
+                document.cookie = `${cookieName}=${encodeURIComponent(JSON.stringify(data))}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+                
+                // Update local state
+                this.lastReadChapter = chapter;
+                this.lastReadPage = page;
+                this.hasProgress = true;
+                this.loadProgress();
+            },
+            
+            resetProgress() {
+                if (!confirm('Are you sure you want to reset your reading progress?')) {
+                    return;
+                }
+                
+                const cookieName = `manga_${this.mangaId}_progress`;
+                document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
+                
+                // Reset local state
+                this.hasProgress = false;
+                this.lastReadChapter = 0;
+                this.lastReadPage = 0;
+                this.continueChapter = 0;
+                this.isCompleted = false;
+                this.progressPercentage = 0;
+                
+                // Announce to screen readers
+                this.announce('Reading progress has been reset');
+            },
+            
+            isChapterRead(chapterNum) {
+                return this.hasProgress && chapterNum <= this.lastReadChapter;
+            },
+            
+            findNextChapter(currentChapterNum) {
+                const sortedChapters = [...this.chapters].sort((a, b) => a.chapter_num - b.chapter_num);
+                const currentIndex = sortedChapters.findIndex(ch => ch.chapter_num == currentChapterNum);
+                return currentIndex >= 0 && currentIndex < sortedChapters.length - 1 
+                    ? sortedChapters[currentIndex + 1] 
+                    : null;
+            },
+            
+            startReading() {
+                if (this.isCompleted) {
+                    // Re-read from start
+                    this.jumpToFirst();
+                } else if (this.hasProgress) {
+                    // Continue reading
+                    const chapter = this.chapters.find(ch => ch.chapter_num == this.continueChapter);
+                    if (chapter) {
+                        const startPage = chapter.chapter_num == this.lastReadChapter ? this.lastReadPage : 1;
+                        this.openReader(chapter.chapter_id, chapter.chapter_num, startPage);
+                    }
+                } else {
+                    // Start from beginning
+                    this.jumpToFirst();
+                }
+            },
+            
+            jumpToFirst() {
+                if (this.chapters.length > 0) {
+                    const firstChapter = [...this.chapters].sort((a, b) => a.chapter_num - b.chapter_num)[0];
+                    this.openReader(firstChapter.chapter_id, firstChapter.chapter_num, 1);
+                }
+            },
+            
+            openChapter(chapterId, chapterNum) {
+                this.openReader(chapterId, chapterNum, 1);
+            },
+            
+            openReader(chapterId, chapterNum, startPage) {
+                // TODO: This will open the actual reader
+                console.log(`Opening reader for Chapter ${chapterNum}, starting at page ${startPage}`);
+                
+                // For now, just save progress
+                this.saveProgress(chapterNum, startPage);
+                
+                // In the future, this would navigate to:
+                // window.location.href = `/reader/${this.mangaId}/${chapterId}?page=${startPage}&lang=${this.selectedLanguage || 'en'}`;
+            },
+            
+            announce(message) {
+                const announcement = document.createElement('div');
+                announcement.setAttribute('aria-live', 'polite');
+                announcement.setAttribute('aria-atomic', 'true');
+                announcement.style.position = 'absolute';
+                announcement.style.left = '-10000px';
+                announcement.textContent = message;
+                
+                document.body.appendChild(announcement);
+                setTimeout(() => document.body.removeChild(announcement), 1000);
+            }
+        }
+    }
+</script>
+{% endblock %}

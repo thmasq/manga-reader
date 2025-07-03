@@ -225,7 +225,7 @@ def search():
 
 @app.route("/manga/<int:manga_id>")
 def manga_detail(manga_id):
-    """Individual manga details"""
+    """Individual manga details page"""
     conn = get_db_connection()
     if not conn:
         return "Database connection error", 500
@@ -300,7 +300,10 @@ def manga_detail(manga_id):
                 "chapters": [dict(chapter) for chapter in chapters] if chapters else [],
             }
 
-            return jsonify(manga_data)
+            if request.headers.get("Accept") == "application/json":
+                return jsonify(manga_data)
+            else:
+                return render_template("manga_detail.html", manga=manga_data)
 
     except Exception as e:
         logger.error(f"Error fetching manga details: {e}")

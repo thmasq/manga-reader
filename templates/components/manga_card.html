@@ -6,7 +6,6 @@
     tabindex="0"
     role="button"
     :aria-label="'View details for {{ manga.title }}'"
-    :class="{ 'loading': loading }"
 >
     <div class="manga-cover">
         {% if manga.cover_path %}
@@ -46,32 +45,10 @@
 <script>
     function mangaCard(mangaId) {
         return {
-            loading: false,
             mangaId: mangaId,
             
-            async handleClick() {
-                if (this.loading) return;
-                
-                try {
-                    this.loading = true;
-                    console.log('Clicked manga ID:', this.mangaId);
-                    
-                    const response = await fetch(`/manga/${this.mangaId}`);
-                    if (response.ok) {
-                        const mangaData = await response.json();
-                        console.log('Manga details:', mangaData);
-                        
-                        // Here you could open a modal or navigate to a detail page
-                        // For now, just log the data
-                    } else {
-                        console.error('Failed to fetch manga details');
-                    }
-                    
-                } catch (error) {
-                    console.error('Error handling manga click:', error);
-                } finally {
-                    this.loading = false;
-                }
+            handleClick() {
+                window.location.href = `/manga/${this.mangaId}`;
             },
             
             handleKeydown(event) {
