@@ -167,7 +167,7 @@ def get_manga_list(
 
 def get_section_manga(manga_list, section_type, limit=6):
     """Get manga for specific sections"""
-    if section_type == "just-published":
+    if section_type == "just-updated":
         sorted_by_date = sorted(
             manga_list,
             key=lambda x: datetime.strptime(x["publishDate"], "%Y-%m-%d"),
@@ -183,7 +183,7 @@ def index():
     manga_list = get_manga_list()
 
     sections = {
-        "just_published": get_section_manga(manga_list, "just-published"),
+        "just_updated": get_section_manga(manga_list, "just-updated"),
     }
 
     return render_template("gallery.html", sections=sections)
@@ -208,7 +208,7 @@ def search():
     if not show_search_results:
         # Show default sections when no filters applied
         sections = {
-            "just_published": get_section_manga(filtered_manga, "just-published"),
+            "just_updated": get_section_manga(filtered_manga, "just-updated"),
         }
     else:
         # Show search results

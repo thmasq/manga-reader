@@ -17,11 +17,11 @@
         {% endif %}
     </section>
 {% else %}
-    {% if sections.just_published %}
+    {% if sections.just_updated %}
         <section>
-            <h2 class="section-title">Just Published</h2>
+            <h2 class="section-title">Just Updated</h2>
             <div class="manga-grid">
-                {% for manga in sections.just_published %}
+                {% for manga in sections.just_updated %}
                     {% include 'components/manga_card.html' %}
                 {% endfor %}
             </div>
