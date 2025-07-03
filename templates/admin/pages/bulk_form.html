@@ -1,0 +1,312 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Bulk Create Pages - Chapter {{ chapter.chapter_num }} ({{ chapter.language_name_en }}) - {{ chapter.name_english or chapter.name_romanized or chapter.name_original or 'Unknown' }} - Manga Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Bulk Create Pages</h1>
+    <p class="page-subtitle">Chapter {{ chapter.chapter_num }} - {{ chapter.name_english or chapter.name_romanized or chapter.name_original or 'Unknown' }} ({{ chapter.language_name_en }})</p>
+</div>
+
+<!-- Information Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">ℹ️ Bulk Page Creation</h2>
+    </div>
+    <div class="card-body">
+        <div style="background-color: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 0.375rem; padding: 1rem; margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--gray-700); font-size: 0.875rem; font-weight: 600;">How bulk page creation works:</h3>
+            <ul style="margin: 0; padding-left: 1rem; font-size: 0.875rem; color: var(--gray-600);">
+                <li><strong>Sequential numbering:</strong> Creates pages with consecutive numbers (e.g., 1, 2, 3, 4, 5)</li>
+                <li><strong>Custom paths:</strong> You specify exactly where your images are located</li>
+                <li><strong>Automatic filename generation:</strong> Combines your path + page number + extension</li>
+                <li><strong>Conflict handling:</strong> Can skip existing pages or warn about duplicates</li>
+            </ul>
+        </div>
+        
+        <div style="background-color: #e0f2fe; border: 1px solid #81d4fa; border-radius: 0.375rem; padding: 1rem; margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem; color: #0277bd; font-size: 0.875rem; font-weight: 600;">💡 Path Examples:</h3>
+            <div style="font-family: monospace; font-size: 0.875rem; color: #0277bd; line-height: 1.4;">
+                <div><strong>Your input:</strong> <code>kojin_tamer/chapters/1</code> → <strong>Result:</strong> <code>kojin_tamer/chapters/1/22.jpg</code></div>
+                <div><strong>Your input:</strong> <code>manga/vol1/ch01</code> → <strong>Result:</strong> <code>manga/vol1/ch01/1.png</code></div>
+                <div><strong>Your input:</strong> <code>images/chapter_001</code> → <strong>Result:</strong> <code>images/chapter_001/5.webp</code></div>
+            </div>
+        </div>
+        
+        {% if existing_pages %}
+            <div style="background-color: #fef3c7; border: 1px solid #fde68a; border-radius: 0.375rem; padding: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="margin-bottom: 0.5rem; color: #92400e; font-size: 0.875rem; font-weight: 600;">⚠️ Existing Pages:</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: #92400e;">
+                    Pages already exist: 
+                    <strong>
+                        {% for page_num in existing_pages[:10] %}
+                            {{ page_num }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                        {% if existing_pages|length > 10 %}
+                            ... and {{ existing_pages|length - 10 }} more
+                        {% endif %}
+                    </strong>
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Bulk Creation Form -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Bulk Creation Settings</h2>
+    </div>
+    <div class="card-body">
+        <form method="POST" onsubmit="return validateForm()">
+            <div class="flex gap-2">
+                <div class="form-group" style="flex: 1;">
+                    <label for="start_page" class="form-label">Start Page Number</label>
+                    <input type="number" id="start_page" name="start_page" class="form-input" 
+                           required min="1" value="{{ next_page_num }}"
+                           placeholder="e.g., 1">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="end_page" class="form-label">End Page Number</label>
+                    <input type="number" id="end_page" name="end_page" class="form-input" 
+                           required min="1" value="{{ next_page_num + 9 }}"
+                           placeholder="e.g., 20">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="file_extension" class="form-label">File Extension</label>
+                    <select id="file_extension" name="file_extension" class="form-select" required>
+                        <option value="png">PNG (.png)</option>
+                        <option value="jpg">JPEG (.jpg)</option>
+                        <option value="jpeg">JPEG (.jpeg)</option>
+                        <option value="webp">WebP (.webp)</option>
+                        <option value="gif">GIF (.gif)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="base_path" class="form-label">Image Base Path</label>
+                <input type="text" id="base_path" name="base_path" class="form-input"
+                       placeholder="e.g., kojin_tamer/chapters/1"
+                       value="{{ suggested_paths.structured }}">
+                <small style="color: var(--gray-500); font-size: 0.75rem;">
+                    The directory path where your images are stored. Page numbers and file extensions will be appended automatically.
+                    <br><strong>Examples:</strong> "kojin_tamer/chapters/1", "manga/vol1/ch01", "images/chapter_001"
+                    <br><strong>Note:</strong> Don't include trailing slash - it will be added automatically
+                </small>
+                
+                <div style="margin-top: 0.75rem;">
+                    <label style="font-size: 0.875rem; font-weight: 500; color: var(--gray-700); margin-bottom: 0.5rem; display: block;">Quick Templates:</label>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-small btn-secondary" onclick="setBasePath('{{ suggested_paths.simple }}')">
+                            Simple: {{ suggested_paths.simple }}
+                        </button>
+                        <button type="button" class="btn btn-small btn-secondary" onclick="setBasePath('{{ suggested_paths.structured }}')">
+                            Structured: {{ suggested_paths.structured }}
+                        </button>
+                        <button type="button" class="btn btn-small btn-secondary" onclick="setBasePath('{{ suggested_paths.volume }}')">
+                            Volume: {{ suggested_paths.volume }}
+                        </button>
+                        <button type="button" class="btn btn-small btn-secondary" onclick="clearBasePath()">
+                            Auto-generate
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="skip_existing" checked>
+                    <span class="form-label" style="margin: 0;">Skip existing pages (recommended)</span>
+                </label>
+                <small style="color: var(--gray-500); font-size: 0.75rem;">
+                    If unchecked, will show errors for pages that already exist.
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="update_chapter_count" checked>
+                    <span class="form-label" style="margin: 0;">Update chapter page count after creation</span>
+                </label>
+                <small style="color: var(--gray-500); font-size: 0.75rem;">
+                    Automatically update the chapter's total page count to match the actual number of pages.
+                </small>
+            </div>
+            
+            <div class="flex gap-2 mt-2">
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                    Create Pages
+                </button>
+                <a href="{{ url_for('page_list', chapter_id=chapter.chapter_id, language_id=language_id) }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Preview Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Preview</h2>
+    </div>
+    <div class="card-body">
+        <p style="color: var(--gray-600); margin-bottom: 0.5rem;">The following pages will be created:</p>
+        <div id="preview" style="font-family: monospace; background-color: var(--gray-50); padding: 1rem; border-radius: 0.375rem; color: var(--gray-700); max-height: 200px; overflow-y: auto;">
+            <div id="preview-content">
+                <!-- Preview will be populated by JavaScript -->
+            </div>
+        </div>
+        <div id="preview-summary" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--gray-600);">
+            <!-- Summary will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<style>
+.conflict-warning {
+    color: var(--error-color);
+    font-weight: 600;
+}
+
+.preview-item {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.preview-item:last-child {
+    border-bottom: none;
+}
+
+.preview-item.conflict {
+    background-color: #fee2e2;
+    padding-left: 0.5rem;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+}
+</style>
+
+<script>
+function setBasePath(path) {
+    const input = document.getElementById('base_path');
+    input.value = path;
+    input.focus();
+    
+    // Brief visual feedback
+    input.style.borderColor = 'var(--success-color)';
+    setTimeout(() => {
+        input.style.borderColor = '';
+    }, 1000);
+    
+    updatePreview();
+}
+
+function clearBasePath() {
+    const input = document.getElementById('base_path');
+    input.value = '';
+    input.focus();
+    updatePreview();
+}
+
+function validateForm() {
+    const startPage = parseInt(document.getElementById('start_page').value);
+    const endPage = parseInt(document.getElementById('end_page').value);
+    const basePath = document.getElementById('base_path').value.trim();
+    
+    if (startPage > endPage) {
+        alert('Start page must be less than or equal to end page');
+        return false;
+    }
+    
+    if (!basePath) {
+        alert('Please specify an image base path or use one of the quick templates');
+        return false;
+    }
+    
+    const pageCount = endPage - startPage + 1;
+    if (pageCount > 100) {
+        return confirm(`You are about to create ${pageCount} pages. This is a large number. Continue?`);
+    }
+    
+    return true;
+}
+
+function updatePreview() {
+    const startPage = parseInt(document.getElementById('start_page').value) || 1;
+    const endPage = parseInt(document.getElementById('end_page').value) || 1;
+    const fileExt = document.getElementById('file_extension').value || 'png';
+    const basePath = document.getElementById('base_path').value.trim();
+    
+    const existingPages = {{ existing_pages | tojsonfilter }};
+    
+    const previewContent = document.getElementById('preview-content');
+    const previewSummary = document.getElementById('preview-summary');
+    
+    if (startPage > endPage) {
+        previewContent.innerHTML = '<div style="color: var(--error-color);">Invalid range: Start page must be ≤ end page</div>';
+        previewSummary.innerHTML = '';
+        return;
+    }
+    
+    if (!basePath) {
+        previewContent.innerHTML = '<div style="color: var(--warning-color);">Please specify a base path to see preview</div>';
+        previewSummary.innerHTML = 'Use quick templates above or enter a custom path';
+        return;
+    }
+    
+    const pageCount = endPage - startPage + 1;
+    let conflictCount = 0;
+    let items = [];
+    
+    // Show first 10 items and summary
+    const maxShow = 10;
+    for (let i = startPage; i <= Math.min(endPage, startPage + maxShow - 1); i++) {
+        const isConflict = existingPages.includes(i);
+        if (isConflict) conflictCount++;
+        
+        const path = `${basePath}/${i}.${fileExt}`;
+        const item = `<div class="preview-item ${isConflict ? 'conflict' : ''}">
+            Page ${i}: ${path} ${isConflict ? '<span class="conflict-warning">(EXISTS)</span>' : ''}
+        </div>`;
+        items.push(item);
+    }
+    
+    previewContent.innerHTML = items.join('');
+    
+    if (pageCount > maxShow) {
+        previewContent.innerHTML += `<div class="preview-item" style="font-style: italic; color: var(--gray-500);">
+            ... and ${pageCount - maxShow} more pages
+        </div>`;
+    }
+    
+    // Count total conflicts
+    for (let i = startPage + maxShow; i <= endPage; i++) {
+        if (existingPages.includes(i)) conflictCount++;
+    }
+    
+    // Summary
+    let summaryParts = [`${pageCount} pages total`];
+    if (conflictCount > 0) {
+        summaryParts.push(`<span class="conflict-warning">${conflictCount} conflicts</span>`);
+    }
+    summaryParts.push(`in directory: <code style="background-color: var(--gray-200); padding: 0.125rem 0.25rem; border-radius: 0.125rem;">${basePath}/</code>`);
+    previewSummary.innerHTML = summaryParts.join(', ');
+}
+
+// Update preview when inputs change
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = ['start_page', 'end_page', 'file_extension', 'base_path'];
+    inputs.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('input', updatePreview);
+            element.addEventListener('change', updatePreview);
+        }
+    });
+    
+    // Initial preview
+    updatePreview();
+});
+</script>
+{% endblock %}

@@ -10,61 +10,362 @@
             <p class="page-subtitle">{{ chapter.name_english or chapter.name_romanized or chapter.name_original or 'Unknown' }} - {{ chapter.language_name_en }}</p>
         </div>
         <div class="flex gap-2">
-            <a href="{{ url_for('page_new', chapter_id=chapter.chapter_id, language_id=language_id) }}" class="btn btn-primary">Add New Page</a>
-            <a href="{{ url_for('chapter_translations', chapter_id=chapter.chapter_id) }}" class="btn btn-secondary">Back to Translations</a>
+            <a href="{{ url_for('page_new', chapter_id=chapter.chapter_id, language_id=language_id) }}" class="btn btn-primary">📄 Add New Page</a>
+            <a href="{{ url_for('bulk_create_pages', chapter_id=chapter.chapter_id, language_id=language_id) }}" class="btn btn-success">📋 Bulk Create Pages</a>
+            <a href="{{ url_for('chapter_edit', chapter_id=chapter.chapter_id) }}" class="btn btn-secondary">📖 Back to Chapter</a>
         </div>
     </div>
 </div>
+
+<!-- Page Statistics -->
+<div class="stats-grid" style="margin-bottom: 2rem;">
+    <div class="stat-card">
+        <div class="stat-number">{{ pages|length }}</div>
+        <div class="stat-label">Total Pages</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ chapter.language_name_en }}</div>
+        <div class="stat-label">Language</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ pages|selectattr('page_path')|list|length }}</div>
+        <div class="stat-label">With Images</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ (pages|selectattr('page_path')|list|length / pages|length * 100)|round if pages else 0 }}%</div>
+        <div class="stat-label">Completion</div>
+    </div>
+</div>
+
+<!-- Bulk Actions -->
+{% if pages %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-header">
+        <h2 class="card-title">Bulk Actions</h2>
+    </div>
+    <div class="card-body">
+        <div class="flex gap-2">
+            <a href="{{ url_for('bulk_create_pages', chapter_id=chapter.chapter_id, language_id=language_id) }}" class="btn btn-primary btn-small">
+                📋 Bulk Create Pages
+            </a>
+            <button onclick="toggleMissingImages()" class="btn btn-secondary btn-small" id="missing-toggle">
+                👁️ Show Missing Images Only
+            </button>
+            <button onclick="exportPageList()" class="btn btn-secondary btn-small">
+                📤 Export Page List
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <div class="card">
     <div class="card-header">
         <div class="flex justify-between items-center">
             <h2 class="card-title">Page List</h2>
-            <span class="relationship-tag">{{ pages|length }} pages</span>
+            {% if pages %}
+                <div class="flex gap-2 items-center">
+                    <span class="relationship-tag">{{ pages|length }} pages</span>
+                    <button onclick="toggleViewMode()" class="btn btn-small btn-secondary" id="view-toggle">
+                        🔳 Grid View
+                    </button>
+                </div>
+            {% endif %}
         </div>
     </div>
     <div class="card-body">
         {% if pages %}
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
-                {% for page in pages %}
-                <div class="card" style="margin: 0;">
-                    <div class="card-body text-center">
-                        <div style="aspect-ratio: 3/4; background-color: var(--gray-100); border-radius: 0.375rem; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem;">
-                            {% if page.page_path %}
-                                <img src="{{ url_for('serve_image', image_path=page.page_path) }}" 
-                                     alt="Page {{ page.page_num }}"
-                                     style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 0.375rem;"
-                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                <div style="display: none; color: var(--gray-500); font-size: 0.875rem;">
-                                    No Preview
+            <!-- Table View (default) -->
+            <div id="table-view">
+                <div class="table-container" style="overflow-x: auto;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Page #</th>
+                                <th>Preview</th>
+                                <th>Image Path</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for page in pages %}
+                            <tr class="page-row" data-has-image="{{ 'true' if page.page_path else 'false' }}">
+                                <td><strong>Page {{ page.page_num }}</strong></td>
+                                <td>
+                                    <div style="width: 60px; height: 80px; background-color: var(--gray-100); border-radius: 0.25rem; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                        {% if page.page_path %}
+                                            <img src="{{ url_for('serve_image', image_path=page.page_path) }}" 
+                                                 alt="Page {{ page.page_num }} preview"
+                                                 style="max-width: 100%; max-height: 100%; object-fit: cover;"
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            <div style="display: none; color: var(--gray-500); font-size: 0.75rem; text-align: center;">
+                                                Error
+                                            </div>
+                                        {% else %}
+                                            <div style="color: var(--gray-500); font-size: 0.75rem; text-align: center;">
+                                                No Image
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if page.page_path %}
+                                        <code style="font-size: 0.75rem; background-color: var(--gray-100); padding: 0.25rem 0.5rem; border-radius: 0.25rem; word-break: break-all;">
+                                            {{ page.page_path }}
+                                        </code>
+                                    {% else %}
+                                        <span style="color: var(--gray-500); font-style: italic;">No path set</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if page.page_path %}
+                                        <span class="relationship-tag status-completed" style="font-size: 0.75rem;">Has Image</span>
+                                    {% else %}
+                                        <span class="relationship-tag status-ongoing" style="font-size: 0.75rem;">Missing Image</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="flex gap-1">
+                                        <a href="{{ url_for('page_edit', page_id=page.page_id) }}" class="btn btn-small btn-primary">Edit</a>
+                                        <form method="POST" action="{{ url_for('page_delete', page_id=page.page_id) }}" style="display: inline;" 
+                                              onsubmit="return confirm('Are you sure you want to delete page {{ page.page_num }}?')">
+                                            <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Grid View (hidden by default) -->
+            <div id="grid-view" style="display: none;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                    {% for page in pages %}
+                    <div class="card page-card" style="margin: 0;" data-has-image="{{ 'true' if page.page_path else 'false' }}">
+                        <div class="card-body text-center">
+                            <div style="aspect-ratio: 3/4; background-color: var(--gray-100); border-radius: 0.375rem; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; position: relative; overflow: hidden;">
+                                {% if page.page_path %}
+                                    <img src="{{ url_for('serve_image', image_path=page.page_path) }}" 
+                                         alt="Page {{ page.page_num }}"
+                                         style="max-width: 100%; max-height: 100%; object-fit: cover; border-radius: 0.375rem;"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div style="display: none; color: var(--gray-500); font-size: 0.875rem;">
+                                        Error Loading
+                                    </div>
+                                {% else %}
+                                    <div style="color: var(--gray-500); font-size: 0.875rem;">
+                                        No Image
+                                    </div>
+                                {% endif %}
+                                
+                                <!-- Page number overlay -->
+                                <div style="position: absolute; top: 0.5rem; left: 0.5rem; background: rgba(0,0,0,0.8); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;">
+                                    {{ page.page_num }}
                                 </div>
-                            {% else %}
-                                <div style="color: var(--gray-500); font-size: 0.875rem;">
-                                    No Image
+                                
+                                <!-- Status indicator -->
+                                <div style="position: absolute; top: 0.5rem; right: 0.5rem;">
+                                    {% if page.page_path %}
+                                        <div style="width: 10px; height: 10px; background-color: var(--success-color); border-radius: 50%; border: 2px solid white;"></div>
+                                    {% else %}
+                                        <div style="width: 10px; height: 10px; background-color: var(--warning-color); border-radius: 50%; border: 2px solid white;"></div>
+                                    {% endif %}
                                 </div>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <strong>Page {{ page.page_num }}</strong>
-                            {% if page.page_path %}
-                                <br><small style="color: var(--gray-500); word-break: break-all;">{{ page.page_path }}</small>
-                            {% endif %}
-                        </div>
-                        <div class="flex gap-1 mt-2" style="justify-content: center;">
-                            <a href="{{ url_for('page_edit', page_id=page.page_id) }}" class="btn btn-small btn-primary">Edit</a>
-                            <form method="POST" action="{{ url_for('page_delete', page_id=page.page_id) }}" style="display: inline;" 
-                                  onsubmit="return confirm('Are you sure you want to delete this page?')">
-                                <button type="submit" class="btn btn-small btn-danger">Delete</button>
-                            </form>
+                            </div>
+                            
+                            <div>
+                                <strong>Page {{ page.page_num }}</strong>
+                                {% if page.page_path %}
+                                    <br><small style="color: var(--gray-500); word-break: break-all; font-size: 0.75rem;">
+                                        {{ page.page_path|truncate(30) }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex gap-1 mt-2" style="justify-content: center;">
+                                <a href="{{ url_for('page_edit', page_id=page.page_id) }}" class="btn btn-small btn-primary">Edit</a>
+                                <form method="POST" action="{{ url_for('page_delete', page_id=page.page_id) }}" style="display: inline;" 
+                                      onsubmit="return confirm('Are you sure you want to delete page {{ page.page_num }}?')">
+                                    <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                                </form>
+                            </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
         {% else %}
-            <p class="text-center">No pages found. <a href="{{ url_for('page_new', chapter_id=chapter.chapter_id, language_id=language_id) }}">Add the first page</a>!</p>
+            <div style="text-align: center; padding: 3rem; color: var(--gray-500);">
+                <h3 style="margin-bottom: 0.5rem;">No pages found</h3>
+                <p style="margin-bottom: 1.5rem;">This translation doesn't have any pages yet.</p>
+                <a href="{{ url_for('page_new', chapter_id=chapter.chapter_id, language_id=language_id) }}" class="btn btn-primary">
+                    📄 Add First Page
+                </a>
+            </div>
         {% endif %}
     </div>
 </div>
-{% endblock %}
 
+<!-- Quick Navigation -->
+{% if pages %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Quick Navigation</h2>
+    </div>
+    <div class="card-body">
+        <div class="flex gap-2 flex-wrap">
+            <a href="{{ url_for('chapter_list', manga_id=chapter.manga_id) }}" class="btn btn-secondary btn-small">
+                📚 All Chapters
+            </a>
+            <a href="{{ url_for('chapter_translations', chapter_id=chapter.chapter_id) }}" class="btn btn-secondary btn-small">
+                🌐 Other Translations
+            </a>
+            <a href="{{ url_for('manga_edit', manga_id=chapter.manga_id) }}" class="btn btn-secondary btn-small">
+                📖 Edit Manga
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.page-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.page-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.table-container {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.page-row.hidden {
+    display: none;
+}
+
+.status-completed {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.status-ongoing {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .flex.gap-2.flex-wrap {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+let currentView = 'table';
+let showMissingOnly = false;
+
+function toggleViewMode() {
+    const tableView = document.getElementById('table-view');
+    const gridView = document.getElementById('grid-view');
+    const toggleBtn = document.getElementById('view-toggle');
+    
+    if (currentView === 'table') {
+        tableView.style.display = 'none';
+        gridView.style.display = 'block';
+        toggleBtn.textContent = '📋 Table View';
+        currentView = 'grid';
+    } else {
+        tableView.style.display = 'block';
+        gridView.style.display = 'none';
+        toggleBtn.textContent = '🔳 Grid View';
+        currentView = 'table';
+    }
+    
+    localStorage.setItem('pageViewMode', currentView);
+}
+
+function toggleMissingImages() {
+    const toggleBtn = document.getElementById('missing-toggle');
+    const rows = document.querySelectorAll('.page-row');
+    const cards = document.querySelectorAll('.page-card');
+    
+    showMissingOnly = !showMissingOnly;
+    
+    if (showMissingOnly) {
+        toggleBtn.textContent = '👁️ Show All Pages';
+        toggleBtn.className = 'btn btn-warning btn-small';
+        
+        rows.forEach(row => {
+            if (row.dataset.hasImage === 'true') {
+                row.classList.add('hidden');
+            }
+        });
+        
+        cards.forEach(card => {
+            if (card.dataset.hasImage === 'true') {
+                card.style.display = 'none';
+            }
+        });
+    } else {
+        toggleBtn.textContent = '👁️ Show Missing Images Only';
+        toggleBtn.className = 'btn btn-secondary btn-small';
+        
+        rows.forEach(row => {
+            row.classList.remove('hidden');
+        });
+        
+        cards.forEach(card => {
+            card.style.display = 'block';
+        });
+    }
+}
+
+function exportPageList() {
+    const pages = [];
+    document.querySelectorAll('.page-row').forEach(row => {
+        const pageNum = row.querySelector('strong').textContent.replace('Page ', '');
+        const pathElement = row.querySelector('code');
+        const path = pathElement ? pathElement.textContent : '';
+        const hasImage = row.dataset.hasImage === 'true';
+        
+        pages.push({
+            page: pageNum,
+            path: path,
+            hasImage: hasImage
+        });
+    });
+    
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + "Page,Path,Has Image\n"
+        + pages.map(p => `${p.page},"${p.path}",${p.hasImage}`).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `chapter_{{ chapter.chapter_num }}_{{ chapter.language_name_en }}_pages.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Restore view mode preference
+document.addEventListener('DOMContentLoaded', function() {
+    const savedView = localStorage.getItem('pageViewMode');
+    if (savedView === 'grid') {
+        toggleViewMode();
+    }
+});
+</script>
+{% endblock %}

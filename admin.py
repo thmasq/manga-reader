@@ -1,10 +1,22 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import (
+    Flask,
+    render_template,
+    request,
+    jsonify,
+    redirect,
+    url_for,
+    flash,
+    send_from_directory,
+    abort,
+)
 from datetime import date
 import psycopg2
 import psycopg2.extras
 import os
 import logging
 from decimal import Decimal
+import json
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -17,6 +29,14 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://manga_user:manga_password@localhost:5433/manga_db"
 )
+
+# Data directory configuration
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+
+@app.template_filter("tojsonfilter")
+def to_json_filter(obj):
+    return json.dumps(obj)
 
 
 def get_db_connection():
@@ -282,7 +302,7 @@ def chapter_edit(chapter_id):
             # Get chapter and manga info
             cur.execute(
                 """
-                SELECT c.*, m.name_english, m.name_romanized, m.name_original
+                SELECT c.*, m.name_english, m.name_romanized, m.name_original, m.manga_id
                 FROM chapter c
                 JOIN manga m ON c.manga_id = m.manga_id
                 WHERE c.chapter_id = %s
@@ -296,8 +316,52 @@ def chapter_edit(chapter_id):
                 return redirect(url_for("manga_list"))
 
             if request.method == "GET":
+                # Get existing translations for this chapter
+                cur.execute(
+                    """
+                    SELECT tt.*, l.language_name_en,
+                           COUNT(p.page_id) as page_count
+                    FROM translated_to tt
+                    JOIN language l ON tt.language_id = l.language_id
+                    LEFT JOIN pages p ON tt.chapter_id = p.chapter_id AND tt.language_id = p.language_id
+                    WHERE tt.chapter_id = %s
+                    GROUP BY tt.language_id, tt.chapter_id, tt.translation_date, tt.translator_notes, tt.is_complete, l.language_name_en
+                    ORDER BY l.language_name_en
+                """,
+                    (chapter_id,),
+                )
+                chapter_translations = cur.fetchall()
+
+                # Get available languages (languages supported by manga but not yet translated)
+                cur.execute(
+                    """
+                    SELECT l.language_id, l.language_name_en
+                    FROM language l
+                    JOIN supports s ON l.language_id = s.language_id
+                    WHERE s.manga_id = %s
+                    AND l.language_id NOT IN (
+                        SELECT language_id FROM translated_to WHERE chapter_id = %s
+                    )
+                    ORDER BY l.language_name_en
+                """,
+                    (chapter["manga_id"], chapter_id),
+                )
+                available_languages = cur.fetchall()
+
+                # Get total page count across all translations
+                cur.execute(
+                    "SELECT COUNT(*) FROM pages WHERE chapter_id = %s",
+                    (chapter_id,),
+                )
+                total_pages = cur.fetchone()[0]
+
                 return render_template(
-                    "admin/chapters/form.html", manga=chapter, chapter=chapter
+                    "admin/chapters/form.html",
+                    manga=chapter,
+                    chapter=chapter,
+                    chapter_translations=chapter_translations,
+                    available_languages=available_languages,
+                    total_pages=total_pages,
                 )
 
             else:  # POST request
@@ -316,7 +380,7 @@ def chapter_edit(chapter_id):
 
                 conn.commit()
                 flash("Chapter updated successfully!", "success")
-                return redirect(url_for("chapter_list", manga_id=chapter["manga_id"]))
+                return redirect(url_for("chapter_edit", chapter_id=chapter_id))
 
     except psycopg2.IntegrityError:
         conn.rollback()
@@ -450,10 +514,30 @@ def chapter_add_translation(chapter_id):
     conn = get_db_connection()
     if not conn:
         flash("Database connection error", "error")
-        return redirect(url_for("chapter_translations", chapter_id=chapter_id))
+        return redirect(url_for("chapter_edit", chapter_id=chapter_id))
 
     try:
         with conn.cursor() as cur:
+            # Verify the chapter exists and get manga_id
+            cur.execute(
+                "SELECT manga_id FROM chapter WHERE chapter_id = %s", (chapter_id,)
+            )
+            result = cur.fetchone()
+            if not result:
+                flash("Chapter not found", "error")
+                return redirect(url_for("manga_list"))
+
+            manga_id = result[0]
+
+            # Verify the language is supported by the manga
+            cur.execute(
+                "SELECT 1 FROM supports WHERE manga_id = %s AND language_id = %s",
+                (manga_id, language_id),
+            )
+            if not cur.fetchone():
+                flash("Language is not supported by this manga", "error")
+                return redirect(url_for("chapter_edit", chapter_id=chapter_id))
+
             cur.execute(
                 """
                 INSERT INTO translated_to (language_id, chapter_id, translation_date, is_complete)
@@ -479,7 +563,7 @@ def chapter_add_translation(chapter_id):
     finally:
         conn.close()
 
-    return redirect(url_for("chapter_translations", chapter_id=chapter_id))
+    return redirect(url_for("chapter_edit", chapter_id=chapter_id))
 
 
 @app.route(
@@ -490,7 +574,7 @@ def chapter_remove_translation(chapter_id, language_id):
     conn = get_db_connection()
     if not conn:
         flash("Database connection error", "error")
-        return redirect(url_for("chapter_translations", chapter_id=chapter_id))
+        return redirect(url_for("chapter_edit", chapter_id=chapter_id))
 
     try:
         with conn.cursor() as cur:
@@ -506,7 +590,7 @@ def chapter_remove_translation(chapter_id, language_id):
                     f"Cannot remove translation: {page_count} pages exist for this translation. Delete pages first.",
                     "error",
                 )
-                return redirect(url_for("chapter_translations", chapter_id=chapter_id))
+                return redirect(url_for("chapter_edit", chapter_id=chapter_id))
 
             cur.execute(
                 "DELETE FROM translated_to WHERE chapter_id = %s AND language_id = %s",
@@ -522,7 +606,7 @@ def chapter_remove_translation(chapter_id, language_id):
     finally:
         conn.close()
 
-    return redirect(url_for("chapter_translations", chapter_id=chapter_id))
+    return redirect(url_for("chapter_edit", chapter_id=chapter_id))
 
 
 # ====================== PAGE MANAGEMENT ======================
@@ -591,6 +675,30 @@ def page_list(chapter_id, language_id):
         return redirect(url_for("manga_list"))
     finally:
         conn.close()
+
+
+@app.route("/images/<path:image_path>")
+def serve_image(image_path):
+    """Serve images from the data directory"""
+    try:
+        if ".." in image_path or image_path.startswith("/"):
+            abort(404)
+
+        full_path = os.path.join(DATA_DIR, image_path)
+
+        if not os.path.exists(full_path) or not os.path.abspath(full_path).startswith(
+            os.path.abspath(DATA_DIR)
+        ):
+            abort(404)
+
+        directory = os.path.dirname(full_path)
+        filename = os.path.basename(full_path)
+
+        return send_from_directory(directory, filename)
+
+    except Exception as e:
+        logger.error(f"Error serving image {image_path}: {e}")
+        abort(404)
 
 
 @app.route(
@@ -753,6 +861,246 @@ def bulk_create_chapters(manga_id):
         logger.error(f"Bulk chapter creation error: {e}")
         flash(f"Error creating chapters: {str(e)}", "error")
         return render_template("admin/bulk/chapters.html", manga=manga)
+    finally:
+        conn.close()
+
+
+@app.route(
+    "/chapters/<int:chapter_id>/pages/<language_id>/bulk", methods=["GET", "POST"]
+)
+def bulk_create_pages(chapter_id, language_id):
+    """Bulk create pages for a chapter in specific language"""
+    conn = get_db_connection()
+    if not conn:
+        flash("Database connection error", "error")
+        return redirect(url_for("manga_list"))
+
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            # Get chapter, manga, and language info
+            cur.execute(
+                """
+                SELECT c.*, m.name_english, m.name_romanized, m.name_original, m.manga_id,
+                       l.language_name_en
+                FROM chapter c
+                JOIN manga m ON c.manga_id = m.manga_id
+                JOIN language l ON l.language_id = %s
+                WHERE c.chapter_id = %s
+            """,
+                (language_id, chapter_id),
+            )
+            chapter_info = cur.fetchone()
+
+            if not chapter_info:
+                flash("Chapter or language not found", "error")
+                return redirect(url_for("manga_list"))
+
+            # Check if translation exists
+            cur.execute(
+                "SELECT * FROM translated_to WHERE chapter_id = %s AND language_id = %s",
+                (chapter_id, language_id),
+            )
+            translation = cur.fetchone()
+
+            if not translation:
+                flash("Translation does not exist for this chapter", "error")
+                return redirect(url_for("chapter_translations", chapter_id=chapter_id))
+
+            # Get existing pages to show what would conflict
+            cur.execute(
+                """
+                SELECT page_num FROM pages 
+                WHERE chapter_id = %s AND language_id = %s
+                ORDER BY page_num
+            """,
+                (chapter_id, language_id),
+            )
+            existing_pages = [row["page_num"] for row in cur.fetchall()]
+
+            # Get next available page number
+            next_page_num = 1
+            if existing_pages:
+                next_page_num = max(existing_pages) + 1
+
+            # Generate suggested path templates (needed for both GET and POST error cases)
+            manga_name = (
+                chapter_info["name_english"]
+                or chapter_info["name_romanized"]
+                or chapter_info["name_original"]
+                or f"manga_{chapter_info['manga_id']}"
+            )
+            # Sanitize manga name for file system
+            clean_manga_name = "".join(
+                c for c in manga_name if c.isalnum() or c in (" ", "-", "_")
+            ).rstrip()
+            clean_manga_name = clean_manga_name.replace(" ", "_").lower()
+
+            suggested_paths = {
+                "simple": f"{clean_manga_name}/ch{int(chapter_info['chapter_num'])}",
+                "structured": f"{clean_manga_name}/chapters/{int(chapter_info['chapter_num'])}",
+                "volume": f"{clean_manga_name}/vol1/chapter_{int(chapter_info['chapter_num']):03d}",
+            }
+
+            if request.method == "GET":
+                return render_template(
+                    "admin/pages/bulk_form.html",
+                    chapter=chapter_info,
+                    language_id=language_id,
+                    existing_pages=existing_pages,
+                    next_page_num=next_page_num,
+                    suggested_paths=suggested_paths,
+                )
+
+            else:  # POST request
+                start_page = int(request.form["start_page"])
+                end_page = int(request.form["end_page"])
+                file_extension = request.form["file_extension"].strip()
+                base_path = request.form.get("base_path", "").strip()
+                skip_existing = request.form.get("skip_existing") == "on"
+
+                # Validation
+                if start_page > end_page:
+                    flash("Start page must be less than or equal to end page", "error")
+                    return render_template(
+                        "admin/pages/bulk_form.html",
+                        chapter=chapter_info,
+                        language_id=language_id,
+                        existing_pages=existing_pages,
+                        next_page_num=next_page_num,
+                        suggested_paths=suggested_paths,
+                    )
+
+                if not file_extension:
+                    flash("File extension is required", "error")
+                    return render_template(
+                        "admin/pages/bulk_form.html",
+                        chapter=chapter_info,
+                        language_id=language_id,
+                        existing_pages=existing_pages,
+                        next_page_num=next_page_num,
+                        suggested_paths=suggested_paths,
+                    )
+
+                if not base_path:
+                    flash("Image base path is required", "error")
+                    return render_template(
+                        "admin/pages/bulk_form.html",
+                        chapter=chapter_info,
+                        language_id=language_id,
+                        existing_pages=existing_pages,
+                        next_page_num=next_page_num,
+                        suggested_paths=suggested_paths,
+                    )
+
+                # Ensure file extension starts with dot
+                if not file_extension.startswith("."):
+                    file_extension = "." + file_extension
+
+                # Clean up base path (remove leading/trailing slashes)
+                base_path = base_path.strip("/")
+
+                # Validate base path for security (prevent directory traversal)
+                if ".." in base_path or base_path.startswith("/"):
+                    flash("Invalid base path: Directory traversal not allowed", "error")
+                    return render_template(
+                        "admin/pages/bulk_form.html",
+                        chapter=chapter_info,
+                        language_id=language_id,
+                        existing_pages=existing_pages,
+                        next_page_num=next_page_num,
+                        suggested_paths=suggested_paths,
+                    )
+
+                # Track results
+                created_count = 0
+                skipped_count = 0
+                errors = []
+
+                # Create pages in range
+                for page_num in range(start_page, end_page + 1):
+                    try:
+                        # Check if page already exists
+                        if page_num in existing_pages:
+                            if skip_existing:
+                                skipped_count += 1
+                                continue
+                            else:
+                                errors.append(f"Page {page_num} already exists")
+                                continue
+
+                        # Generate page path
+                        page_path = f"{base_path}/{page_num}{file_extension}"
+
+                        # Insert page
+                        cur.execute(
+                            """
+                            INSERT INTO pages (page_num, page_path, chapter_id, language_id)
+                            VALUES (%s, %s, %s, %s)
+                        """,
+                            (page_num, page_path, chapter_id, language_id),
+                        )
+                        created_count += 1
+
+                    except psycopg2.IntegrityError:
+                        # Page already exists (race condition)
+                        skipped_count += 1
+                        conn.rollback()
+                        conn = get_db_connection()  # Get new connection after rollback
+                        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                        continue
+                    except Exception as e:
+                        errors.append(f"Error creating page {page_num}: {str(e)}")
+                        continue
+
+                # Commit all successful inserts
+                conn.commit()
+
+                # Update chapter page count if requested
+                if request.form.get("update_chapter_count") == "on":
+                    cur.execute(
+                        "SELECT COUNT(*) FROM pages WHERE chapter_id = %s AND language_id = %s",
+                        (chapter_id, language_id),
+                    )
+                    total_pages = cur.fetchone()[0]
+
+                    cur.execute(
+                        "UPDATE chapter SET page_count = %s WHERE chapter_id = %s",
+                        (total_pages, chapter_id),
+                    )
+                    conn.commit()
+
+                # Build result message
+                message_parts = []
+                if created_count > 0:
+                    message_parts.append(f"Created {created_count} pages")
+                if skipped_count > 0:
+                    message_parts.append(f"skipped {skipped_count} existing pages")
+                if errors:
+                    message_parts.append(f"{len(errors)} errors occurred")
+
+                if message_parts:
+                    flash(
+                        "Bulk operation completed: " + ", ".join(message_parts),
+                        "success" if not errors else "warning",
+                    )
+
+                if errors:
+                    for error in errors[:5]:  # Show first 5 errors
+                        flash(error, "error")
+                    if len(errors) > 5:
+                        flash(f"... and {len(errors) - 5} more errors", "error")
+
+                return redirect(
+                    url_for("page_list", chapter_id=chapter_id, language_id=language_id)
+                )
+
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Bulk page creation error: {e}")
+        flash(f"Error during bulk operation: {str(e)}", "error")
+        return redirect(
+            url_for("page_list", chapter_id=chapter_id, language_id=language_id)
+        )
     finally:
         conn.close()
 
@@ -1057,11 +1405,6 @@ def advanced_search():
     finally:
         conn.close()
 
-
-# ====================== DATA DIRECTORY UTILITIES ======================
-
-# Set DATA_DIR constant
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 # ====================== HEALTH CHECK ======================
 

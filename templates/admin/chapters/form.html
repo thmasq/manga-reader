@@ -49,39 +49,257 @@
     <div class="relationship-section">
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Translations</h2>
+                <div class="flex justify-between items-center">
+                    <h2 class="card-title">Translations</h2>
+                    <a href="{{ url_for('chapter_translations', chapter_id=chapter.chapter_id) }}" class="btn btn-primary btn-small">
+                        🌐 Manage All Translations
+                    </a>
+                </div>
             </div>
             <div class="card-body">
-                <p style="color: var(--gray-500); margin-bottom: 1rem;">
-                    Manage which languages this chapter is translated to. Note: Only languages supported by the manga can be added.
-                </p>
-                
-                <!-- Add translation form would go here -->
-                <div class="text-center" style="padding: 2rem; color: var(--gray-500);">
-                    <p>Translation management coming soon...</p>
-                    <p><small>For now, translations must be managed through the database directly.</small></p>
-                </div>
+                {% if chapter_translations %}
+                    <div class="translation-summary">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Language</th>
+                                    <th>Status</th>
+                                    <th>Pages</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for translation in chapter_translations %}
+                                <tr>
+                                    <td><strong>{{ translation.language_name_en }}</strong></td>
+                                    <td>
+                                        <span class="relationship-tag {% if translation.is_complete %}status-completed{% else %}status-ongoing{% endif %}">
+                                            {{ 'Complete' if translation.is_complete else 'In Progress' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ translation.page_count }} pages</td>
+                                    <td>
+                                        <a href="{{ url_for('page_list', chapter_id=chapter.chapter_id, language_id=translation.language_id) }}" 
+                                           class="btn btn-small btn-primary">📄 Manage Pages</a>
+                                        {% if translation.page_count == 0 %}
+                                            <form method="POST" action="{{ url_for('chapter_remove_translation', chapter_id=chapter.chapter_id, language_id=translation.language_id) }}" style="display: inline;" 
+                                                  onsubmit="return confirm('Are you sure you want to remove this translation?')">
+                                                <button type="submit" class="btn btn-small btn-danger">Remove</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 2rem; color: var(--gray-500);">
+                        <p><strong>No translations yet</strong></p>
+                        <p>Add translations to start creating pages for this chapter.</p>
+                    </div>
+                {% endif %}
+
+                <!-- Quick Add Translation -->
+                {% if available_languages %}
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
+                        <h4 style="margin-bottom: 1rem; color: var(--gray-700); font-size: 0.875rem; font-weight: 600;">Quick Add Translation</h4>
+                        <form method="POST" action="{{ url_for('chapter_add_translation', chapter_id=chapter.chapter_id) }}" class="add-relationship-form">
+                            <div class="form-group">
+                                <select name="language_id" class="form-select" required>
+                                    <option value="">Select Language</option>
+                                    {% for lang in available_languages %}
+                                        <option value="{{ lang.language_id }}">{{ lang.language_name_en }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="is_complete">
+                                    <span style="font-size: 0.875rem;">Mark as Complete</span>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-success">Add Translation</button>
+                        </form>
+                    </div>
+                {% else %}
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200); text-align: center; color: var(--gray-500);">
+                        <p><small>All supported languages for this manga already have translations.</small></p>
+                        <p><small>Add more language support to the manga to create additional translations.</small></p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Page Management -->
+    <!-- Page Management Overview -->
     <div class="relationship-section">
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Pages</h2>
+                <div class="flex justify-between items-center">
+                    <h2 class="card-title">Pages Overview</h2>
+                    <span class="relationship-tag">{{ total_pages }} total pages</span>
+                </div>
             </div>
             <div class="card-body">
-                <p style="color: var(--gray-500); margin-bottom: 1rem;">
-                    Manage individual pages for this chapter.
-                </p>
-                
-                <div class="text-center" style="padding: 2rem; color: var(--gray-500);">
-                    <p>Page management coming soon...</p>
-                    <p><small>For now, pages must be managed through the database directly.</small></p>
+                {% if chapter_translations %}
+                    <div class="pages-overview">
+                        <p style="color: var(--gray-600); margin-bottom: 1rem;">
+                            Pages are managed per translation. Click "Manage Pages" for each language to add, edit, or delete pages.
+                        </p>
+                        
+                        <div class="page-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            {% for translation in chapter_translations %}
+                            <div class="page-stat-card" style="background-color: var(--gray-50); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--gray-200);">
+                                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 0.5rem;">
+                                    <h4 style="margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--gray-700);">
+                                        {{ translation.language_name_en }}
+                                    </h4>
+                                    <span class="relationship-tag" style="font-size: 0.75rem;">
+                                        {{ translation.page_count }} pages
+                                    </span>
+                                </div>
+                                
+                                {% if translation.page_count > 0 %}
+                                    <div style="margin-bottom: 0.75rem;">
+                                        <div style="background-color: var(--gray-200); height: 4px; border-radius: 2px; overflow: hidden;">
+                                            <div style="background-color: var(--success-color); height: 100%; width: {{ (translation.page_count / [translation.page_count, 20]|max * 100)|round }}%; transition: width 0.3s ease;"></div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                <div class="flex gap-1">
+                                    <a href="{{ url_for('page_list', chapter_id=chapter.chapter_id, language_id=translation.language_id) }}" 
+                                       class="btn btn-small btn-primary" style="flex: 1; font-size: 0.75rem;">
+                                        {% if translation.page_count > 0 %}View Pages{% else %}Add Pages{% endif %}
+                                    </a>
+                                    <a href="{{ url_for('bulk_create_pages', chapter_id=chapter.chapter_id, language_id=translation.language_id) }}" 
+                                       class="btn btn-small btn-success" style="font-size: 0.75rem;" title="Bulk Create Pages">📋</a>
+                                    {% if translation.page_count > 0 %}
+                                        <a href="{{ url_for('page_new', chapter_id=chapter.chapter_id, language_id=translation.language_id) }}" 
+                                           class="btn btn-small btn-success" style="font-size: 0.75rem;" title="Add Single Page">+</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if total_pages > 0 %}
+                            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
+                                <h4 style="margin-bottom: 0.5rem; color: var(--gray-700); font-size: 0.875rem; font-weight: 600;">Quick Actions</h4>
+                                <div class="flex gap-2">
+                                    <a href="{{ url_for('chapter_translations', chapter_id=chapter.chapter_id) }}" class="btn btn-secondary btn-small">
+                                        🔧 Manage All Translations
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 2rem; color: var(--gray-500);">
+                        <p><strong>No pages available</strong></p>
+                        <p>Add translations first to start creating pages for this chapter.</p>
+                        <div style="margin-top: 1rem;">
+                            <a href="{{ url_for('chapter_translations', chapter_id=chapter.chapter_id) }}" class="btn btn-primary">
+                                🌐 Add Translations
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Chapter Actions -->
+    <div class="relationship-section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Chapter Actions</h2>
+            </div>
+            <div class="card-body">
+                <div class="flex gap-2 flex-wrap">
+                    <a href="{{ url_for('chapter_list', manga_id=manga.manga_id) }}" class="btn btn-secondary">
+                        📚 Back to Chapters
+                    </a>
+                    <a href="{{ url_for('manga_edit', manga_id=manga.manga_id) }}" class="btn btn-secondary">
+                        📖 Edit Manga
+                    </a>
+                    {% if chapter_translations %}
+                        <a href="{{ url_for('chapter_translations', chapter_id=chapter.chapter_id) }}" class="btn btn-primary">
+                            🌐 Manage Translations
+                        </a>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('chapter_delete', chapter_id=chapter.chapter_id) }}" style="display: inline;" 
+                          onsubmit="return confirm('Are you sure you want to delete this chapter? This will also delete all translations and pages.')">
+                        <button type="submit" class="btn btn-danger">🗑️ Delete Chapter</button>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 {% endif %}
+
+<style>
+.translation-summary {
+    margin-bottom: 1rem;
+}
+
+.pages-overview {
+    
+}
+
+.page-stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.page-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.page-stats-grid {
+    margin-bottom: 1rem;
+}
+
+.relationship-section {
+    margin-top: 2rem;
+}
+
+.status-completed {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.status-ongoing {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+/* Ensure proper spacing for form elements */
+.add-relationship-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: end;
+}
+
+.add-relationship-form .form-group {
+    margin-bottom: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .page-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .add-relationship-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .flex.gap-2.flex-wrap {
+        flex-direction: column;
+    }
+}
+</style>
 {% endblock %}
